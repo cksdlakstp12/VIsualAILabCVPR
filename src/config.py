@@ -18,14 +18,14 @@ PATH.JSON_GT_FILE = os.path.join('kaist_annotations_test20.json' )
 train = edict()
 
 train.day = "all"
-train.img_set = f"train-split-1ps.txt"
+train.img_set = f"train-split-1ps_43seed.txt"
 
 train.checkpoint = None ## Load chekpoint
 
-train.batch_size = 4 # batch size
+train.batch_size = 6 # batch size
 
 train.start_epoch = 0  # start at this epoch
-train.epochs = 40  # number of epochs to run without early-stopping
+train.epochs = 80  # number of epochs to run without early-stopping
 train.epochs_since_improvement = 3  # number of epochs since there was an improvement in the validation metric
 train.best_loss = 100.  # assume a high loss at first
 

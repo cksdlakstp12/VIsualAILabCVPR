@@ -21,6 +21,9 @@ torch.backends.cudnn.benchmark = False
 # random seed fix 
 utils.set_seed(seed=9)
 
+print("device count :", torch.cuda.device_count())
+print("available :", torch.cuda.is_available())
+
 
 def main():
     """Train and validate a model"""
@@ -116,7 +119,7 @@ def main():
         # Save checkpoint
         utils.save_checkpoint(epoch, model.module, optimizer, train_loss, jobs_dir)
         
-        if epoch >= 3:
+        if epoch >= 15:
             result_filename = os.path.join(jobs_dir, f'Epoch{epoch:03d}_test_det.txt')
 
             # High min_score setting is important to guarantee reasonable number of detections

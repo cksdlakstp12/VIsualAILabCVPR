@@ -8,8 +8,6 @@
 #SBATCH --time=24:00:00
 #SBATCH --partition batch_ce_ugrad
 #SBATCH -o slurm/logs/slurm-%A-%x.out
-#SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=cksdlakstp12@khu.ac.kr
 
 pip install easydict
 pip install Pillow==8.3.0
