@@ -1540,7 +1540,7 @@ class RandomGrayscale(object):
         return self.__class__.__name__ + '(p={0})'.format(self.p)
     
 class RandomErasing(object):
-    def __init__(self, p=0.5, sl=0.02, sh=0.4, r1=0.3, r2=3.0):
+    def __init__(self, p=0.5, sl=0.02, sh=0.33, r1=0.3, r2=3.3):
         self.p = p
         self.sl = sl
         self.sh = sh
