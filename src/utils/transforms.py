@@ -65,10 +65,10 @@ class Compose(object):
         for t in self.transforms:    
 
             if self.args != None and t.__class__.__name__ in self.args.want_augmentation:
-                #print(f"want 이번 실행은 : {t}")
+                print(f"want 이번 실행은 : {t}")
                 img, mask, vis_box, lwir_box, pair = t(img, mask, vis_box, lwir_box, pair)
             else:
-                #print(f"normal 이번 실행은 : {t}")
+                print(f"normal 이번 실행은 : {t}")
                 img, mask, vis_box, lwir_box = t(img, mask, vis_box, lwir_box)
         
         return img, mask, vis_box, lwir_box, pair
@@ -1549,7 +1549,7 @@ class RandomErasing(object):
 
     def __call__(self, img, mask, boxes_vis, boxes_lwir):
         if random.uniform(0, 1) > self.p:
-            return img
+            return img, mask, boxes_vis, boxes_lwir
 
         c, h, w = img.size()
 

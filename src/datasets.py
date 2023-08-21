@@ -220,9 +220,11 @@ class KAISTPedWS(KAISTPed):
     """
     def __init__(self, args, aug_mode, condition='train'):
         super().__init__(args, condition)
+        self.pair = 1
         self.aug_mode = aug_mode
-        self.weak_transform = args[aug_mode].weak_transform 
-        self.strong_transform = args[aug_mode].strong_transform 
+        self.weak_transform = args[condition].weak_transform 
+        self.weak4strong_transform = args[condition].weak4strong_transform 
+        self.strong_transform = args[condition].strong_transform 
 
     def pull_item(self, index):
         
@@ -279,13 +281,12 @@ class KAISTPedWS(KAISTPed):
 
         ## Apply transforms
         if self.aug_mode == "weak":
-            vis, lwir, boxes_vis , boxes_lwir, _ = self.weak_transform(vis, lwir, boxes_vis, boxes_lwir)
+            vis, lwir, boxes_vis , boxes_lwir, _ = self.weak_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
         else:
-            vis, lwir, boxes_vis , boxes_lwir, _ = self.strong_transform(vis, lwir, boxes_vis, boxes_lwir)
+            vis, lwir, boxes_vis , boxes_lwir, _ = self.weak4strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
+            vis, lwir, boxes_vis , boxes_lwir, _ = self.strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
 
         if self.co_transform is not None:
-            
-            pair = 1
 
             # vis, lwir, boxes_vis, boxes_lwir, pair = self.co_transform(vis, lwir, boxes_vis, boxes_lwir, pair)                      
             if boxes_vis is None:
@@ -298,7 +299,7 @@ class KAISTPedWS(KAISTPed):
                 ##  1  /  0  = 1
                 ##  0  /  1  = 2
                 ##  1  /  1  = 3
-                if pair == 1 :
+                if self.pair == 1 :
                     if len(boxes_vis.shape) != 1 :
                         boxes_vis[1:,4] = 3
                     if len(boxes_lwir.shape) != 1 :

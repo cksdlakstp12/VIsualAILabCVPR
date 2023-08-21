@@ -152,12 +152,13 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
                                     ])
 
 ## for our new method
-args["weak"].weak_transform = Compose([ RandomHorizontalFlip(p=0.5),
+args["train"].weak_transform = Compose([ RandomHorizontalFlip(p=0.5),
                                         ToTensor()
-                                    ])
-args["strong"].strong_transform = Compose([ ColorJitter(0.3, 0.3, 0.3), 
+                                    ], args=args)
+args["train"].weak4strong_transform = Compose([ RandomHorizontalFlip(p=0.5)
+                                    ], args=args)
+args["train"].strong_transform = Compose([ ColorJitter(0.3, 0.3, 0.3), 
                                             ColorJitterLWIR(contrast=0.3),
-                                            RandomHorizontalFlip(p=0.5),
+                                            ToTensor(),
                                             RandomErasing(),
-                                            ToTensor()
-                                    ])
+                                    ], args=args)
