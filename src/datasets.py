@@ -202,6 +202,145 @@ class KAISTPed(data.Dataset):
   
         return vis, lwir, boxes, labels, index  
 
+class KAISTPedWS(KAISTPed):
+    """KAIST Detection Dataset Object
+    input is image, target is annotation
+    Arguments:
+        root (string): filepath to VOCdevkit folder.
+        image_set (string): imageset to use (eg. 'train', 'val', 'test')
+        transform (callable, optional): transformation to perform on the
+            input image
+        target_transform (callable, optional): transformation to perform on the
+            target `annotation`
+            (eg: take in caption string, return tensor of word indices)
+        dataset_name (string, optional): which dataset to load
+            (default: 'KAIST')
+        condition (string, optional): load condition
+            (default: 'Reasonabel')
+    """
+    def __init__(self, args, aug_mode, condition='train'):
+        super().__init__(args, condition)
+        self.aug_mode = aug_mode
+        self.weak_transform = args[aug_mode].weak_transform 
+        self.strong_transform = args[aug_mode].strong_transform 
+
+    def pull_item(self, index):
+        
+        frame_id = self.ids[index]
+        set_id, vid_id, img_id = frame_id[-1]
+
+        vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id ))
+        lwir = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id ) ).convert('L')
+    
+        width, height = lwir.size
+
+        # paired annotation
+        if self.mode == 'train': 
+            vis_boxes = list()
+            lwir_boxes = list()
+
+            for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id )) :
+                vis_boxes.append(line.strip().split(' '))
+            for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id)) :
+                lwir_boxes.append(line.strip().split(' '))
+
+            vis_boxes = vis_boxes[1:]
+            lwir_boxes = lwir_boxes[1:]
+
+            boxes_vis = [[0, 0, 0, 0, -1]]
+            boxes_lwir = [[0, 0, 0, 0, -1]]
+
+            for i in range(len(vis_boxes)) :
+                name = vis_boxes[i][0]
+                bndbox = [int(i) for i in vis_boxes[i][1:5]]
+                bndbox[2] = min( bndbox[2] + bndbox[0], width )
+                bndbox[3] = min( bndbox[3] + bndbox[1], height )
+                bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
+                bndbox.append(1)
+                boxes_vis += [bndbox]
+
+            for i in range(len(lwir_boxes)) :
+                name = lwir_boxes[i][0]
+                bndbox = [int(i) for i in lwir_boxes[i][1:5]]
+                bndbox[2] = min( bndbox[2] + bndbox[0], width )
+                bndbox[3] = min( bndbox[3] + bndbox[1], height )
+                bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
+                bndbox.append(1)
+                boxes_lwir += [bndbox]
+
+            boxes_vis = np.array(boxes_vis, dtype=np.float)
+            boxes_lwir = np.array(boxes_lwir, dtype=np.float)
+
+        else :
+            boxes_vis = [[0, 0, 0, 0, -1]]
+            boxes_lwir = [[0, 0, 0, 0, -1]]
+            boxes_vis = np.array(boxes_vis, dtype=np.float)
+            boxes_lwir = np.array(boxes_lwir, dtype=np.float)
+
+        ## Apply transforms
+        if self.aug_mode == "weak":
+            vis, lwir, boxes_vis , boxes_lwir, _ = self.weak_transform(vis, lwir, boxes_vis, boxes_lwir)
+        else:
+            vis, lwir, boxes_vis , boxes_lwir, _ = self.strong_transform(vis, lwir, boxes_vis, boxes_lwir)
+
+        if self.co_transform is not None:
+            
+            pair = 1
+
+            # vis, lwir, boxes_vis, boxes_lwir, pair = self.co_transform(vis, lwir, boxes_vis, boxes_lwir, pair)                      
+            if boxes_vis is None:
+                boxes = boxes_lwir
+            elif boxes_lwir is None:
+                boxes = boxes_vis
+            else : 
+                ## Pair Condition
+                ## RGB / Thermal
+                ##  1  /  0  = 1
+                ##  0  /  1  = 2
+                ##  1  /  1  = 3
+                if pair == 1 :
+                    if len(boxes_vis.shape) != 1 :
+                        boxes_vis[1:,4] = 3
+                    if len(boxes_lwir.shape) != 1 :
+                        boxes_lwir[1:,4] = 3
+                else : 
+                    
+                    if len(boxes_vis.shape) != 1 :
+                        boxes_vis[1:,4] = 1
+                    if len(boxes_lwir.shape) != 1 :
+                        boxes_lwir[1:,4] = 2
+                
+                boxes = torch.cat((boxes_vis,boxes_lwir), dim=0)
+                boxes = torch.tensor(list(map(list,set([tuple(bb) for bb in boxes.numpy()]))))   
+
+        ## Set ignore flags
+        ignore = torch.zeros( boxes.size(0), dtype=torch.bool)
+               
+        for ii, box in enumerate(boxes):
+                        
+            x = box[0] * width
+            y = box[1] * height
+            w = ( box[2] - box[0] ) * width
+            h = ( box[3] - box[1] ) * height
+
+            if  x < self.cond['xRng'][0] or \
+                y < self.cond['xRng'][0] or \
+                x+w > self.cond['xRng'][1] or \
+                y+h > self.cond['xRng'][1] or \
+                w < self.cond['wRng'][0] or \
+                w > self.cond['wRng'][1] or \
+                h < self.cond['hRng'][0] or \
+                h > self.cond['hRng'][1]:
+
+                ignore[ii] = 1
+        
+        boxes[ignore, 4] = -1
+        
+        labels = boxes[:,4]
+        boxes_t = boxes[:,0:4]
+        #print("labels : ", labels)
+        return vis, lwir, boxes_t, labels
+
 class LoadBox(object):
     """Transforms a VOC annotation into a Tensor of bbox coords and label index
     Initilized with a dictionary lookup of classnames to indexes

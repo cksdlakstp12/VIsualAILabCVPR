@@ -64,9 +64,11 @@ class Compose(object):
 
         for t in self.transforms:    
 
-            if self.args != None and t.__class__.__name__ in self.args.upaired_augmentation:
+            if self.args != None and t.__class__.__name__ in self.args.want_augmentation:
+                #print(f"want 이번 실행은 : {t}")
                 img, mask, vis_box, lwir_box, pair = t(img, mask, vis_box, lwir_box, pair)
             else:
+                #print(f"normal 이번 실행은 : {t}")
                 img, mask, vis_box, lwir_box = t(img, mask, vis_box, lwir_box)
         
         return img, mask, vis_box, lwir_box, pair
@@ -662,7 +664,7 @@ class RandomHorizontalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
 
-    def __call__(self, img, ann=None, box_vis=None, box_lwir=None):
+    def __call__(self, img, ann=None, box_vis=None, box_lwir=None, pair=None):
         """
         Args:
             img (PIL Image): Image to be flipped.
@@ -670,15 +672,29 @@ class RandomHorizontalFlip(object):
             PIL Image: Randomly flipped image.
         """
         if random.random() < self.p:
+            
             img = F.hflip(img)
             ann = F.hflip(ann) if ann is not None else None
 
-            if box_vis is not None:
+            if box_vis is not None and box_lwir is not None:
+                #print("horizon 정상작동")
                 box_vis = F.box_flip(box_vis)
-            if box_lwir is not None:
-                box_lwir = F.box_flip(box_lwir)
-                   
-        return img, ann, box_vis, box_lwir                  
+                box_lwir = F.box_flip(box_lwir)       
+            else:
+                print("Dont flip")
+                #print("FLIPIPIPIPIP")
+                #print()
+                #print()
+                #print("vis",box_vis)
+                #print()
+                #print()
+                #print("lwir")
+                #print(box_lwir)
+                #print()
+                #print()
+                #print()
+            
+        return img, ann, box_vis, box_lwir, pair
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
@@ -853,22 +869,27 @@ class RandomResizedCrop(object):
         j = (img.size[0] - w) // 2
         return i, j, h, w, np.ones(len(box), dtype=bool)
 
-    def __call__(self, img, mask=None, box=None):
+    def __call__(self, img, mask=None, box_vis=None, box_lwir=None, pair=None):
         """
         Args:
             img (PIL Image): Image to be cropped and resized.
         Returns:
             PIL Image: Randomly cropped and resized image.
         """        
-        i, j, h, w, valid_box = self.get_params(img, self.scale, self.ratio, box)
+        i, j, h, w, valid_box = self.get_params(img, self.scale, self.ratio, box_vis)
       
         width, height = img.size        
 
         img = F.resized_crop(img, i, j, h, w, self.size, self.interpolation)
         mask = F.resized_crop(mask, i, j, h, w, self.size, self.interpolation) if mask is not None else None                    
-        box = F.box_resized_crop(box, i/width, j/height, height/h, width/w) if box is not None else None
-    
-        return img, mask, box
+        box_vis= F.box_resized_crop(box_vis, i/width, j/height, height/h, width/w) if box_vis is not None else None
+        box_lwir = F.box_resized_crop(box_lwir, i/width, j/height, height/h, width/w) if box_lwir is not None else None
+        #print("vis : ", box_vis)
+        #print("lwir : ", box_lwir)
+        if box_vis is not None and box_lwir is not None:
+            return img, mask, box_vis, box_lwir, pair
+        else:
+            print("안 될듯;")
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
@@ -1517,3 +1538,32 @@ class RandomGrayscale(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={0})'.format(self.p)
+    
+class RandomErasing(object):
+    def __init__(self, p=0.5, sl=0.02, sh=0.4, r1=0.3, r2=3.0):
+        self.p = p
+        self.sl = sl
+        self.sh = sh
+        self.r1 = r1
+        self.r2 = r2
+
+    def __call__(self, img, mask, boxes_vis, boxes_lwir):
+        if random.uniform(0, 1) > self.p:
+            return img
+
+        c, h, w = img.size()
+
+        area = h * w
+        target_area = random.uniform(self.sl, self.sh) * area
+        aspect_ratio = random.uniform(self.r1, self.r2)
+
+        h_new = int(round((target_area * aspect_ratio) ** 0.5))
+        w_new = int(round((target_area / aspect_ratio) ** 0.5))
+
+        if w_new < w and h_new < h:
+            x1 = random.randint(0, h - h_new)
+            y1 = random.randint(0, w - w_new)
+            img[:, x1:x1+h_new, y1:y1+w_new] = 0
+            mask[:, x1:x1+h_new, y1:y1+w_new] = 0
+
+        return img, mask, boxes_vis, boxes_lwir

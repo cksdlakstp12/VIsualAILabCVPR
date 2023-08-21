@@ -5,7 +5,8 @@ from easydict import EasyDict as edict
 import torch
 import numpy as np
 
-from utils.transforms_case1 import *
+from utils.transforms import RandomErasing
+from utils.transforms import *
 
 
 # Dataset path
@@ -148,4 +149,15 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
                                      ToTensor(), \
                                      Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), \
                                      Normalize(LWIR_MEAN, LWIR_STD, 'T')                        
+                                    ])
+
+## for our new method
+args["weak"].weak_transform = Compose([ RandomHorizontalFlip(p=0.5),
+                                        ToTensor()
+                                    ])
+args["strong"].strong_transform = Compose([ ColorJitter(0.3, 0.3, 0.3), 
+                                            ColorJitterLWIR(contrast=0.3),
+                                            RandomHorizontalFlip(p=0.5),
+                                            RandomErasing(),
+                                            ToTensor()
                                     ])
