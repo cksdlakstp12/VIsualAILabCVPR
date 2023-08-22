@@ -15,6 +15,11 @@ PATH = edict()
 PATH.DB_ROOT = '../data/kaist-rgbt/'
 PATH.JSON_GT_FILE = os.path.join('kaist_annotations_test20.json' )
 
+# Soft Teacher
+soft_teacher = edict()
+soft_teacher.student_checkpoint = None
+soft_teacher.teacher_checkpoint = ""
+
 # train
 train = edict()
 
@@ -38,10 +43,6 @@ train.grad_clip = None  # clip if gradients are exploding, which may happen at l
 train.print_freq = 10   
 
 train.annotation = "AR-CNN" # AR-CNN, Sanitize, Original 
-
-
-
-
 
 # test & eval
 test = edict()
@@ -151,7 +152,7 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
                                      Normalize(LWIR_MEAN, LWIR_STD, 'T')                        
                                     ])
 
-## for our new method
+## for soft teacher
 args["train"].weak_transform = Compose([ RandomHorizontalFlip(p=0.5),
                                         ToTensor()
                                     ], args=args)
