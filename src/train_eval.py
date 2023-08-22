@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 
-from datasets import KAISTPed
+from datasets import KAISTPed, KAISTPedWS
 from inference import val_epoch, save_results
 from model import SSD300, MultiBoxLoss
 from utils import utils
@@ -20,6 +20,7 @@ torch.backends.cudnn.benchmark = False
 
 # random seed fix 
 utils.set_seed(seed=9)
+
 def initialize_state(n_classes, train_conf):
     model = SSD300(n_classes=n_classes)
     # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
@@ -77,11 +78,29 @@ def load_SoftTeacher(config):
 
     return *student_state, *teacher_state
 
+def create_loader(config, dataset_class, **kwargs):
+    dataset = dataset_class(config.args, **kwargs)
+    if kwargs["condition"] == "test":
+        test_batch_size = config.args["test"].eval_batch_size * torch.cuda.device_count()
+        loader = DataLoader(dataset, batch_size=test_batch_size, shuffle=False,
+                              num_workers=config.dataset.workers,
+                              collate_fn=dataset.collate_fn,
+                              pin_memory=True)  # note that we're passing the collate function here
+    else:
+        loader = DataLoader(dataset, batch_size=config.train.batch_size, shuffle=True,
+                              num_workers=config.dataset.workers,
+                              collate_fn=dataset.collate_fn,
+                              pin_memory=True)  # note that we're passing the collate function here
+    return loader
+
+
 def main():
     """Train and validate a model"""
 
     # TODO(sohwang): why do we need these global variables?
     # global epochs_since_improvement, start_epoch, label_map, best_loss, epoch
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     args = config.args
     train_conf = config.train
@@ -90,57 +109,20 @@ def main():
     epochs = train_conf.epochs
     phase = "Multispectral"
 
-    # Initialize model or load checkpoint
-    if checkpoint is None:
-        model = SSD300(n_classes=args.n_classes)
-        # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
-        biases = list()
-        not_biases = list()
-        for param_name, param in model.named_parameters():
-            if param.requires_grad:
-                if param_name.endswith('.bias'):
-                    biases.append(param)
-                else:
-                    not_biases.append(param)
-        optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * train_conf.lr},
-                                            {'params': not_biases}],
-                                    lr=train_conf.lr,
-                                    momentum=train_conf.momentum,
-                                    weight_decay=train_conf.weight_decay,
-                                    nesterov=False)
-
-        optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                               milestones=[int(epochs * 0.5), int(epochs * 0.9)],
-                                                               gamma=0.1)
-
-    else:
-        checkpoint = torch.load(checkpoint)
-        start_epoch = checkpoint['epoch'] + 1
-        train_loss = checkpoint['loss']
-        print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' % (start_epoch, train_loss))
-        model = checkpoint['model']
-        optimizer = checkpoint['optimizer']
-        optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(epochs * 0.5)], gamma=0.1)
+    # Initialize student model and load teacher checkpoint
+    s_model, s_optimizer, s_optim_scheduler, \
+    t_model, t_optimizer, t_optim_scheduler = load_SoftTeacher(config)
 
     # Move to default device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     model = nn.DataParallel(model)
 
     criterion = MultiBoxLoss(priors_cxcy=model.module.priors_cxcy).to(device)
 
-    train_dataset = KAISTPed(args, condition='train')
-    train_loader = DataLoader(train_dataset, batch_size=train_conf.batch_size, shuffle=True,
-                              num_workers=config.dataset.workers,
-                              collate_fn=train_dataset.collate_fn,
-                              pin_memory=True)  # note that we're passing the collate function here
+    weak_aug_loader = create_loader(args, KAISTPedWS, aug_mode="weak", condition="train")
+    strong_aug_loader = create_loader(args, KAISTPedWS, aug_mode="strong", condition="train")
+    test_loader = create_loader(args, KAISTPed, condition="test")
 
-    test_dataset = KAISTPed(args, condition='test')
-    test_batch_size = args["test"].eval_batch_size * torch.cuda.device_count()
-    test_loader = DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False,
-                             num_workers=config.dataset.workers,
-                             collate_fn=test_dataset.collate_fn,
-                             pin_memory=True)
     # Set job directory
     if args.exp_time is None:
         args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm')
