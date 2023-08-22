@@ -100,8 +100,6 @@ def main():
     # TODO(sohwang): why do we need these global variables?
     # global epochs_since_improvement, start_epoch, label_map, best_loss, epoch
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     args = config.args
     train_conf = config.train
     checkpoint = train_conf.checkpoint
@@ -114,6 +112,7 @@ def main():
     t_model, t_optimizer, t_optim_scheduler = load_SoftTeacher(config)
 
     # Move to default device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     model = nn.DataParallel(model)
 
