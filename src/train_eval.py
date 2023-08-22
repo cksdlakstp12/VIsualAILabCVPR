@@ -45,7 +45,7 @@ def initialize_state(n_classes, train_conf):
                                                             gamma=0.1)
     return model, optimizer, optim_scheduler
 
-def load_checkpoint(train_conf, checkpoint):
+def load_state_from_checkpoint(train_conf, checkpoint):
     checkpoint = torch.load(checkpoint)
     start_epoch = checkpoint['epoch'] + 1
     train_loss = checkpoint['loss']
@@ -53,7 +53,6 @@ def load_checkpoint(train_conf, checkpoint):
     model = checkpoint['model']
     optimizer = checkpoint['optimizer']
     optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(train_conf.epochs * 0.5)], gamma=0.1)
-    
     return model, optimizer, optim_scheduler
 
 def load_state(config, checkpoint): 
@@ -64,7 +63,7 @@ def load_state(config, checkpoint):
     if checkpoint is None:
         model, optimizer, optim_scheduler = initialize_state(args.n_classes, train_conf)
     else:
-        model, optimizer, optim_scheduler = load_checkpoint(train_conf, checkpoint)
+        model, optimizer, optim_scheduler = load_state_from_checkpoint(train_conf, checkpoint)
 
     return (model, optimizer, optim_scheduler)
 
@@ -78,7 +77,7 @@ def load_SoftTeacher(config):
 
     return *student_state, *teacher_state
 
-def create_loader(config, dataset_class, **kwargs):
+def create_dataloader(config, dataset_class, **kwargs):
     dataset = dataset_class(config.args, **kwargs)
     if kwargs["condition"] == "test":
         test_batch_size = config.args["test"].eval_batch_size * torch.cuda.device_count()
@@ -114,14 +113,15 @@ def main():
     t_model, t_optimizer, t_optim_scheduler = load_SoftTeacher(config)
 
     # Move to default device
-    model = model.to(device)
-    model = nn.DataParallel(model)
+    s_model = s_model.to(device)
+    s_model = nn.DataParallel(s_model)
 
-    criterion = MultiBoxLoss(priors_cxcy=model.module.priors_cxcy).to(device)
+    criterion = MultiBoxLoss(priors_cxcy=s_model.module.priors_cxcy).to(device)
 
-    weak_aug_loader = create_loader(args, KAISTPedWS, aug_mode="weak", condition="train")
-    strong_aug_loader = create_loader(args, KAISTPedWS, aug_mode="strong", condition="train")
-    test_loader = create_loader(args, KAISTPed, condition="test")
+    # create dataloader
+    weak_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="weak", condition="train")
+    strong_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="strong", condition="train")
+    test_loader = create_dataloader(args, KAISTPed, condition="test")
 
     # Set job directory
     if args.exp_time is None:
@@ -141,24 +141,26 @@ def main():
     for epoch in range(start_epoch, epochs):
         # One epoch's training
         logger.info('#' * 20 + f' << Epoch {epoch:3d} >> ' + '#' * 20)
-        train_loss = train_epoch(model=model,
-                                 dataloader=train_loader,
+        t_infer_result = val_epoch(t_model, weak_aug_loader, config.test.input_size, min_score=0.1)
+
+        s_train_loss = train_epoch(model=s_model,
+                                 dataloader=strong_aug_loader,
                                  criterion=criterion,
-                                 optimizer=optimizer,
+                                 optimizer=s_optimizer,
                                  logger=logger,
                                  **kwargs)
 
-        optim_scheduler.step()
+        s_optim_scheduler.step()
 
         # Save checkpoint
-        utils.save_checkpoint(epoch, model.module, optimizer, train_loss, jobs_dir)
+        utils.save_checkpoint(epoch, s_model.module, s_optimizer, s_train_loss, jobs_dir)
         
         if epoch >= 15:
             result_filename = os.path.join(jobs_dir, f'Epoch{epoch:03d}_test_det.txt')
 
             # High min_score setting is important to guarantee reasonable number of detections
             # Otherwise, you might see OOM in validation phase at early training epoch
-            results = val_epoch(model, test_loader, config.test.input_size, min_score=0.1)
+            results = val_epoch(s_model, test_loader, config.test.input_size, min_score=0.1)
 
             save_results(results, result_filename)
             
