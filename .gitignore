@@ -4,3 +4,4 @@ src/jobs/*
 error
 slurm
 learning_schedule.txt
+.vscode
