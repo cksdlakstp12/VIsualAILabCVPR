@@ -170,7 +170,7 @@ def train_epoch(model: SSD300,
     # losses_cls = utils.AverageMeter()  # loss_cls
 
     start = time.time()
-    
+
     # Batches
     for batch_idx, (image_vis, image_lwir, vis_box, lwir_box, vis_labels, lwir_labels, _) in enumerate(dataloader):
         data_time.update(time.time() - start)

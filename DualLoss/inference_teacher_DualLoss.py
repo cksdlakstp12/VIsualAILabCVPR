@@ -74,7 +74,7 @@ def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_scor
     results = dict()
     with torch.no_grad():
         for i, blob in enumerate(tqdm(dataloader, desc='Evaluating')):
-            image_vis, image_lwir, vis_boxes,lwir_boxes, vis_labels,lwir_labels, indices = blob
+            image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices = blob
 
             image_vis = image_vis.to(device)
             image_lwir = image_lwir.to(device)
