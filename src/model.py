@@ -604,7 +604,7 @@ class SSD300(nn.Module):
                 image_boxes.append(torch.FloatTensor([[0., 0., 1., 1.]]).to(device))
                 image_labels.append(torch.LongTensor([0]).to(device))
                 image_scores.append(torch.FloatTensor([0.]).to(device))
-                image_bf_scores.append(orch.FloatTensor([0.]).to(device))
+                image_bf_scores.append(torch.FloatTensor([0.]).to(device))
 
             # Concatenate into single tensors
             image_boxes = torch.cat(image_boxes, dim=0)
