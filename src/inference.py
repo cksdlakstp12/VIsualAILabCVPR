@@ -51,9 +51,7 @@ def val_epoch(model: SSD300, dataloader: DataLoader, dataset_type: str, input_si
             if dataset_type is "KAISTPedWS":
                 image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices, _ = blob
             else:
-                print(blob)
-                print(len(blob))
-                image_vis, image_lwir, _, _, indices = blob
+                image_vis, image_lwir, boxes, labels, indices = blob
 
             image_vis = image_vis.to(device)
             image_lwir = image_lwir.to(device)
