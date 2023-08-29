@@ -171,8 +171,8 @@ def train_epoch(model: SSD300,
         un_lwir_box = list()
         un_vis_labels = list()
         un_lwir_labels = list()
-        un_predicted_scores = torch.FloatTensor([])
-        un_predicted_locs = torch.FloatTensor([])
+        un_predicted_scores = torch.FloatTensor([]).to(device)
+        un_predicted_locs = torch.FloatTensor([]).to(device)
 
         for anno, vb, lb, vl, ll, pl, ps in zip(is_anno, vis_box, lwir_box, vis_labels, lwir_labels, predicted_locs, predicted_scores):
             if anno:
