@@ -68,7 +68,6 @@ def create_dataloader(config, dataset_class, **kwargs):
         loader = DataLoader(dataset, batch_size=config.train.batch_size, shuffle=True,
                               num_workers=config.dataset.workers,
                               collate_fn=dataset.collate_fn,
-                              worker_init_fn = lambda id: np.random.seed(kwargs["seed"]),
                               pin_memory=True)  # note that we're passing the collate function here
     else:
         test_batch_size = config.args["test"].eval_batch_size * torch.cuda.device_count()
@@ -76,7 +75,29 @@ def create_dataloader(config, dataset_class, **kwargs):
                               num_workers=config.dataset.workers,
                               collate_fn=dataset.collate_fn,
                               pin_memory=True)  # note that we're passing the collate function here
-    return loader
+    return dataset, loader
+
+def converter(originpath, changepath, wantname):
+    # Loading the 90percents.txt file and creating a dictionary where keys are the index
+    with open(f'{originpath}', 'r') as f:
+        data_90 = {idx+1: line.strip() for idx, line in enumerate(f)}
+
+    # Loading the test2.txt file
+    with open(f'{changepath}', 'r') as f:
+        data_test2 = f.readlines()
+
+    # Replacing the first number of each line in test2.txt with corresponding line in 90percents.txt
+    data_test2_new = []
+    for line in data_test2:
+        items = line.split(',')
+        index = int(items[0])
+        items[0] = data_90[index]
+        data_test2_new.append(','.join(items))
+
+    # Writing the new data into a new file
+    with open(f'{wantname}.txt', 'w') as f:
+        for line in data_test2_new:
+            f.write(line)
 
 def soft_update(teacher_model, student_model, tau):
     """

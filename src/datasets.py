@@ -15,6 +15,8 @@ from utils.utils import *
 
 from utils.transforms import randomHorizontalFlipProp
 
+from collections import defaultdict
+
 class KAISTPed(data.Dataset):
     """KAIST Detection Dataset Object
     input is image, target is annotation
@@ -227,52 +229,39 @@ class KAISTPedWS(KAISTPed):
         self.weak_transform = args[condition].weak_transform 
         self.weak4strong_transform = args[condition].weak4strong_transform 
         self.strong_transform = args[condition].strong_transform 
+        self.annotations = defaultdict(list)
 
         if self.mode == "train":
             self.ids = list()
-            for line in open(os.path.join('../imageSets', self.image_set)):
-                self.ids.append(('../../data/kaist-rgbt/', line.strip().split('/')))
+            for line in open(os.path.join('./imageSets', self.image_set)):
+                self.ids.append(('../data/kaist-rgbt/', line.strip().split('/')))
                 ##print(self.ids)
             self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
             self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
         else:
             self.ids = list()
-            for line in open(os.path.join('../imageSets', self.image_set)):
-                self.ids.append(('../../data/kaist-rgbt/', line.strip().split('/')))
+            for line in open(os.path.join('./imageSets', self.image_set)):
+                self.ids.append(('../data/kaist-rgbt/', line.strip().split('/')))
                 ##print(self.ids)
             self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
             self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
-            
-        ##print(self.ids)
-        print(self.mode)
-        print(self.image_set)
-        print(self.data)
 
-    def load_teacher_inference(self, txt_path, anno_name):
-        self.ids = list()
-        for line in open(os.path.join('./imageSets', self.image_set)):
-            self.ids.append((self.args.path.DB_ROOT, line.strip().split('/')))
-
-        self.img_id = list()
+    def load_teacher_inference(self):
         # Load annotations from file and store in a dictionary
-        self.annotations = dict()
-        with open(txt_path, "r") as f:
-            for line in f:
-                id = line.strip()
-                self.annotations[id] = []
-        with open(anno_name, "r") as f:
+        self.annotations = defaultdict(list)
+        with open(self.args.cnvt_path, "r") as f:
             for line in f:
                 img_id, x, y, w, h, score = line.strip().split(",")
-                self.img_id.append(img_id)
                 if float(score) >= 0.5:
                     self.annotations[img_id].append([float(x), float(y), float(w), float(h), float(score)])
-                    #print(img_id)
+        
+        # Load flip probs
         self.props = dict()
-        with open(args.props_path, "r") as f:
+        with open(self.args.props_path, "r") as f:
             for line in f.readlines():
                 index, prop = line.strip().split(",")
                 self.props[index] = prop
-        os.remove(args.prop_path)
+        os.remove(self.args.prop_path)
 
     def __getitem__(self, index):
         vis, lwir, vis_box, lwir_box, vis_labels,lwir_labels, is_annotation = self.pull_item(index)
@@ -290,7 +279,7 @@ class KAISTPedWS(KAISTPed):
 
         if self.aug_mode == "weak":
             randomHorizontalFlipProp = random.random()
-            with open(args.props_path, "a") as f:
+            with open(self.args.props_path, "a") as f:
                 f.write(f"{index},{randomHorizontalFlipProp}\n")
         else:
             randomHorizontalFlipProp = self.props[index]
@@ -304,7 +293,7 @@ class KAISTPedWS(KAISTPed):
             vis_boxes = list()
             lwir_boxes = list()
             id = f"{set_id}/{vid_id}/{img_id}"
-            if id in self.annotations:
+            if id in self.annotations and self.aug_mode == "strong":
                 # Load bounding boxes from pre-inferred results
                 boxes = self.annotations[id][0:4]
 

@@ -23,7 +23,7 @@ soft_teacher.teacher_checkpoint = "../teacher_weights.pth.tar071"
 train = edict()
 
 train.day = "all"
-train.img_set = f"Labeled_Unlabled_combine.txt"
+train.img_set = f"train-split-1ps.txt"
 
 train.checkpoint = None ## Load chekpoint
 
@@ -155,7 +155,9 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
 
 ## for soft teacher
 args.props_path = "./props.txt"
-args.txt_path = "./imageSets/90percents.txt"
+args.txt_path = "./imageSets/train-split-1ps.txt"
+args.cnvt_path = "./convert.txt"
+
 args.tau = 0.0001
 args["train"].weak_transform = Compose([ RandomHorizontalFlip(p=0.5),
                                         ToTensor()

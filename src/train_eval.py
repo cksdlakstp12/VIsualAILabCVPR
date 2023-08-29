@@ -51,9 +51,9 @@ def main():
     criterion = MultiBoxLoss(priors_cxcy=s_model.module.priors_cxcy).to(device)
 
     # create dataloader
-    weak_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="weak", condition="train", seed=train_conf.random_seed)
-    strong_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="strong", condition="train", seed=train_conf.random_seed)
-    test_loader = create_dataloader(args, KAISTPed, condition="test")
+    weak_aug_dataset, weak_aug_loader = create_dataloader(config, KAISTPedWS, aug_mode="weak", condition="train")
+    strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWS, aug_mode="strong", condition="train")
+    test_loader = create_dataloader(config, KAISTPed, condition="test")
 
     # Set job directory
     if args.exp_time is None:
@@ -77,9 +77,10 @@ def main():
                                    config.test.input_size, 
                                    min_score=0.1)
         result_filename = os.path.join(jobs_dir, f'teacher_inferece_Epoch{epoch:3d}.txt')
-        save_results(results, result_filename)
+        save_results(t_infer_result, result_filename)
+        converter(args.txt_path, result_filename, args.cnvt_path)
 
-        strong_aug_loader.load_teacher_inferece(args.txt_path, result_filename)
+        strong_aug_dataset.load_teacher_inferece()
         s_train_loss = train_epoch(model=s_model,
                                  dataloader=strong_aug_loader,
                                  criterion=criterion,
