@@ -80,7 +80,7 @@ def main():
         save_results(t_infer_result, result_filename)
         converter(args.txt_path, result_filename, args.cnvt_path)
 
-        strong_aug_dataset.load_teacher_inferece()
+        strong_aug_dataset.load_teacher_inference()
         s_train_loss = train_epoch(model=s_model,
                                  dataloader=strong_aug_loader,
                                  criterion=criterion,
