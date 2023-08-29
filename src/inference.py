@@ -48,7 +48,7 @@ def val_epoch(model: SSD300, dataloader: DataLoader, dataset_type: str, input_si
     results = dict()
     with torch.no_grad():
         for i, blob in enumerate(tqdm(dataloader, desc='Evaluating')):
-            if dataset_type is "KAISTPedWS":
+            if dataset_type == "KAISTPedWS":
                 image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices, _ = blob
             else:
                 image_vis, image_lwir, boxes, labels, indices = blob
