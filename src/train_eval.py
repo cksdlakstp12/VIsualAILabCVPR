@@ -189,6 +189,11 @@ def train_epoch(model: SSD300,
                 un_lwir_labels.append(ll.to(device))
                 un_predicted_locs.append(pl)
                 un_predicted_scores.append(ps)
+        
+        sup_predicted_locs = torch.FloatTensor(sup_predicted_locs).to(device)
+        sup_predicted_scores = torch.FloatTensor(sup_predicted_locs).to(device)
+        un_predicted_locs = torch.FloatTensor(sup_predicted_locs).to(device)
+        un_predicted_scores = torch.FloatTensor(sup_predicted_locs).to(device)
 
         if len(sup_vis_box) > 0:
             # vis_Loss
