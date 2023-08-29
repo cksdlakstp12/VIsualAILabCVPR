@@ -17,13 +17,13 @@ PATH.JSON_GT_FILE = os.path.join('kaist_annotations_test20.json' )
 # Soft Teacher
 soft_teacher = edict()
 soft_teacher.student_checkpoint = None
-soft_teacher.teacher_checkpoint = ""
+soft_teacher.teacher_checkpoint = "../teacher_weights.pth.tar071"
 
 # train
 train = edict()
 
 train.day = "all"
-train.img_set = f"train-split-1ps_43seed.txt"
+train.img_set = f"Labeled_Unlabled_combine.txt"
 
 train.checkpoint = None ## Load chekpoint
 
