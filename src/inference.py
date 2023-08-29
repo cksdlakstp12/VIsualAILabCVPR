@@ -19,7 +19,7 @@ from vis import visualize
 from model import SSD300
 
 
-def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_score: float = 0.1) -> Dict:
+def val_epoch(model: SSD300, dataloader: DataLoader, dataset_type: str, input_size: Tuple, min_score: float = 0.1) -> Dict:
     """Validate the model during an epoch
 
     Parameters
@@ -39,10 +39,6 @@ def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_scor
         A Dict of numpy arrays (K x 5: xywh + score) for given image_id key
     """
 
-    dataset_type = type(dataloader.dataset)
-    print(dataset_type)
-    print(type(dataset_type))
-    
     model.eval()
 
     height, width = input_size
@@ -52,7 +48,7 @@ def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_scor
     results = dict()
     with torch.no_grad():
         for i, blob in enumerate(tqdm(dataloader, desc='Evaluating')):
-            if dataset_type is KAISTPedWS:
+            if dataset_type is "KAISTPedWS":
                 image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices, _ = blob
             else:
                 image_vis, image_lwir, _, _, indices = blob

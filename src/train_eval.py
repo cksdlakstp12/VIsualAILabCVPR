@@ -74,6 +74,7 @@ def main():
         # One epoch's training
         logger.info('#' * 20 + f' << Epoch {epoch:3d} >> ' + '#' * 20)
         t_infer_result = val_epoch(t_model, weak_aug_loader, 
+                                   "KAISTPedWS",
                                    config.test.input_size, 
                                    min_score=0.1)
         result_filename = os.path.join(jobs_dir, f'teacher_inferece_Epoch{epoch:3d}.txt')
@@ -101,7 +102,7 @@ def main():
 
             # High min_score setting is important to guarantee reasonable number of detections
             # Otherwise, you might see OOM in validation phase at early training epoch
-            results = val_epoch(s_model, test_loader, config.test.input_size, min_score=0.1)
+            results = val_epoch(s_model, test_loader, "KAISTPed", config.test.input_size, min_score=0.1)
 
             save_results(results, result_filename)
             
