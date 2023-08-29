@@ -282,7 +282,11 @@ class KAISTPedWS(KAISTPed):
             with open(self.args.props_path, "a") as f:
                 f.write(f"{index},{randomHorizontalFlipProp}\n")
         else:
-            randomHorizontalFlipProp = self.props[index]
+            if index in self.props:
+                randomHorizontalFlipProp = self.props[index]
+            else:
+                # 기본 값 설정 또는 오류 메시지 출력
+                randomHorizontalFlipProp = random.random()
 
         vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id ))
         lwir = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id ) ).convert('L')
