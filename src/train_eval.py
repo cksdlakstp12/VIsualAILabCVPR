@@ -191,21 +191,16 @@ def train_epoch(model: SSD300,
                 un_predicted_scores = torch.cat([un_predicted_scores, ps.unsqueeze(0).to(device)], dim=0)
 
         sup_loss, un_loss = torch.zeros(1)[0].to(device), torch.zeros(1)[0].to(device)
-        print(sup_loss)
-        print(un_loss)
+        sup_vis_n_positives, sup_lwir_n_positives, un_vis_n_positives, un_lwir_n_positives = 0, 0, 0, 0
+        
         if len(sup_vis_box) > 0:
             sup_vis_loss, sup_vis_cls_loss, sup_vis_loc_loss, sup_vis_n_positives = criterion(sup_predicted_locs, sup_predicted_scores, sup_vis_box, sup_vis_labels) 
             sup_lwir_loss, sup_lwir_cls_loss, sup_lwir_loc_loss, sup_lwir_n_positives = criterion(sup_predicted_locs, sup_predicted_scores, sup_lwir_box, sup_lwir_labels)
-
             sup_loss = sup_vis_loss + sup_lwir_loss
-            print(sup_loss)
-
         if len(un_vis_box) > 0:
             un_vis_loss, un_vis_cls_loss, un_vis_loc_loss, un_vis_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_vis_box, un_vis_labels)
             un_lwir_loss, un_lwir_cls_loss, un_lwir_loc_loss, un_lwir_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_lwir_box, un_lwir_labels)
-
             un_loss = un_vis_loss + un_lwir_loss + F.mse_loss(un_vis_cls_loss, un_lwir_cls_loss) + F.mse_loss(un_vis_loc_loss, un_lwir_loc_loss)
-            print(un_loss)
 
         loss = sup_loss + un_loss
 
