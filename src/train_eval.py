@@ -164,15 +164,15 @@ def train_epoch(model: SSD300,
         sup_lwir_box = list()
         sup_vis_labels = list()
         sup_lwir_labels = list()
-        sup_predicted_locs = list()
-        sup_predicted_scores = list()
+        sup_predicted_locs = torch.FloatTensor([])
+        sup_predicted_scores = torch.FloatTensor([])
 
         un_vis_box = list()
         un_lwir_box = list()
         un_vis_labels = list()
         un_lwir_labels = list()
-        un_predicted_scores = list()
-        un_predicted_locs = list()
+        un_predicted_scores = torch.FloatTensor([])
+        un_predicted_locs = torch.FloatTensor([])
 
         for anno, vb, lb, vl, ll, pl, ps in zip(is_anno, vis_box, lwir_box, vis_labels, lwir_labels, predicted_locs, predicted_scores):
             if anno:
@@ -180,22 +180,22 @@ def train_epoch(model: SSD300,
                 sup_lwir_box.append(lb.to(device))
                 sup_vis_labels.append(vl.to(device))
                 sup_lwir_labels.append(ll.to(device))
-                sup_predicted_locs.append(pl)
-                sup_predicted_scores.append(ps)
+                sup_predicted_locs = torch.cat([sup_predicted_locs.to(device), pl], dim=0)
+                sup_predicted_scores = torch.cat([sup_predicted_scores.to(device), ps], dim=0)
             else:
                 un_vis_box.append(vb.to(device))
                 un_lwir_box.append(lb.to(device))
                 un_vis_labels.append(vl.to(device))
                 un_lwir_labels.append(ll.to(device))
-                un_predicted_locs.append(pl)
-                un_predicted_scores.append(ps)
+                un_predicted_locs = torch.cat([un_predicted_locs.to(device), pl], dim=0)
+                un_predicted_scores = torch.cat([un_predicted_scores.to(device), ps], dim=0)
         
-        if len(sup_predicted_locs) > 0 and len(sup_predicted_scores) > 0:
-            sup_predicted_locs = torch.cat([tensor.to(device) for tensor in sup_predicted_locs], dim=0)
-            sup_predicted_scores = torch.cat([tensor.to(device) for tensor in sup_predicted_scores], dim=0)
-        if len(un_predicted_locs) > 0 and len(un_predicted_scores) > 0:
-            un_predicted_locs = torch.cat([tensor.to(device) for tensor in un_predicted_locs], dim=0)
-            un_predicted_scores = torch.cat([tensor.to(device) for tensor in un_predicted_scores], dim=0)
+        # if len(sup_predicted_locs) > 0 and len(sup_predicted_scores) > 0:
+        #     sup_predicted_locs = torch.cat([tensor.to(device) for tensor in sup_predicted_locs], dim=0)
+        #     sup_predicted_scores = torch.cat([tensor.to(device) for tensor in sup_predicted_scores], dim=0)
+        # if len(un_predicted_locs) > 0 and len(un_predicted_scores) > 0:
+        #     un_predicted_locs = torch.cat([tensor.to(device) for tensor in un_predicted_locs], dim=0)
+        #     un_predicted_scores = torch.cat([tensor.to(device) for tensor in un_predicted_scores], dim=0)
         
         print(type(predicted_scores))
         print(predicted_scores.size())
