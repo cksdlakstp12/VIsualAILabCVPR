@@ -261,7 +261,7 @@ class KAISTPedWS(KAISTPed):
             for line in f.readlines():
                 index, prop = line.strip().split(",")
                 self.props[index] = prop
-        os.remove(self.args.prop_path)
+        os.remove(self.args.props_path)
 
     def __getitem__(self, index):
         vis, lwir, vis_box, lwir_box, vis_labels,lwir_labels, is_annotation = self.pull_item(index)
