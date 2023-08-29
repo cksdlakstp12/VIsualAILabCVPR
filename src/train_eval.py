@@ -189,39 +189,23 @@ def train_epoch(model: SSD300,
                 un_lwir_labels.append(ll.to(device))
                 un_predicted_locs = torch.cat([un_predicted_locs, pl.unsqueeze(0).to(device)], dim=0)
                 un_predicted_scores = torch.cat([un_predicted_scores, ps.unsqueeze(0).to(device)], dim=0)
-        
-        # if len(sup_predicted_locs) > 0 and len(sup_predicted_scores) > 0:
-        #     sup_predicted_locs = torch.cat([tensor.to(device) for tensor in sup_predicted_locs], dim=0)
-        #     sup_predicted_scores = torch.cat([tensor.to(device) for tensor in sup_predicted_scores], dim=0)
-        # if len(un_predicted_locs) > 0 and len(un_predicted_scores) > 0:
-        #     un_predicted_locs = torch.cat([tensor.to(device) for tensor in un_predicted_locs], dim=0)
-        #     un_predicted_scores = torch.cat([tensor.to(device) for tensor in un_predicted_scores], dim=0)
-        
-        print(type(predicted_scores))
-        print(predicted_scores.size())
-        print(sup_predicted_scores.size())
-        print(un_predicted_scores.size())
-        print(sup_predicted_scores)
-        print(un_predicted_scores)
+
 
         if len(sup_vis_box) > 0:
-            # vis_Loss
-            #print("loss vis box :", vis_box)
-            sup_vis_loss, sup_vis_cls_loss, sup_vis_loc_loss, sup_vis_n_positives = criterion(sup_predicted_locs, sup_predicted_scores, sup_vis_box, sup_vis_labels)  # scalar
-            # lwir_Loss
-            #print("loss lwir box :", lwir_box)
+            sup_vis_loss, sup_vis_cls_loss, sup_vis_loc_loss, sup_vis_n_positives = criterion(sup_predicted_locs, sup_predicted_scores, sup_vis_box, sup_vis_labels) 
             sup_lwir_loss, sup_lwir_cls_loss, sup_lwir_loc_loss, sup_lwir_n_positives = criterion(sup_predicted_locs, sup_predicted_scores, sup_lwir_box, sup_lwir_labels)
 
+            sup_loss = sup_vis_loss + sup_lwir_loss
+            print(sup_loss)
+
         if len(un_vis_box) > 0:
-            # vis_Loss
-            #print("loss vis box :", vis_box)
-            un_vis_loss, un_vis_cls_loss, un_vis_loc_loss, un_vis_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_vis_box, un_vis_labels)  # scalar
-            # lwir_Loss
-            #print("loss lwir box :", lwir_box)
+            un_vis_loss, un_vis_cls_loss, un_vis_loc_loss, un_vis_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_vis_box, un_vis_labels)
             un_lwir_loss, un_lwir_cls_loss, un_lwir_loc_loss, un_lwir_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_lwir_box, un_lwir_labels)
 
-        loss = sup_vis_loss+ sup_lwir_loss + un_vis_loss + un_lwir_loss + F.mse_loss(un_vis_cls_loss, un_lwir_cls_loss) + F.mse_loss(un_vis_loc_loss, un_lwir_loc_loss)
-        #loss = un_vis + un_ir + sup_vis + sup_ir + mse(un_vis_cls, un_ir_cls) + mse(un_vis_loc, un_ir_loc) 
+            un_loss = un_vis_loss + un_lwir_loss + F.mse_loss(un_vis_cls_loss, un_lwir_cls_loss) + F.mse_loss(un_vis_loc_loss, un_lwir_loc_loss)
+            print(un_loss)
+
+        loss = sup_loss + un_loss
 
         # Backward prop.
         optimizer.zero_grad()
