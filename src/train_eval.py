@@ -199,6 +199,8 @@ def train_epoch(model: SSD300,
         
         print(type(predicted_scores))
         print(predicted_scores.size())
+        print(sup_predicted_scores.size())
+        print(un_predicted_scores.size())
         print(sup_predicted_scores)
         print(un_predicted_scores)
 
