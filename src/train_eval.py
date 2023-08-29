@@ -164,8 +164,8 @@ def train_epoch(model: SSD300,
         sup_lwir_box = list()
         sup_vis_labels = list()
         sup_lwir_labels = list()
-        sup_predicted_locs = torch.FloatTensor([])
-        sup_predicted_scores = torch.FloatTensor([])
+        sup_predicted_locs = torch.FloatTensor([]).to(device)
+        sup_predicted_scores = torch.FloatTensor([]).to(device)
 
         un_vis_box = list()
         un_lwir_box = list()
