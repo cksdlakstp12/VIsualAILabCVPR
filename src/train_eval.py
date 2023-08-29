@@ -190,6 +190,9 @@ def train_epoch(model: SSD300,
                 un_predicted_locs.append(pl)
                 un_predicted_scores.append(ps)
         
+        print(type(sup_predicted_locs))
+        print(sup_predicted_locs)
+        
         sup_predicted_locs = torch.FloatTensor(sup_predicted_locs).to(device)
         sup_predicted_scores = torch.FloatTensor(sup_predicted_locs).to(device)
         un_predicted_locs = torch.FloatTensor(sup_predicted_locs).to(device)
