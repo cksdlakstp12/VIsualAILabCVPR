@@ -53,7 +53,7 @@ def main():
     # create dataloader
     weak_aug_dataset, weak_aug_loader = create_dataloader(config, KAISTPedWS, aug_mode="weak", condition="train")
     strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWS, aug_mode="strong", condition="train")
-    _, test_loader = create_dataloader(config, KAISTPed, condition="test")
+    test_dataset, test_loader = create_dataloader(config, KAISTPed, condition="test")
 
     # Set job directory
     if args.exp_time is None:
