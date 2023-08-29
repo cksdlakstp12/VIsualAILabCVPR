@@ -190,8 +190,10 @@ def train_epoch(model: SSD300,
                 un_predicted_locs.append(pl)
                 un_predicted_scores.append(ps)
         
-        print(type(sup_predicted_locs))
-        print(sup_predicted_locs)
+        print(type(predicted_scores))
+        print(predicted_scores.size())
+        print(predicted_scores)
+
         if len(sup_predicted_locs) > 0 and len(sup_predicted_scores) > 0:
             sup_predicted_locs = torch.cat([tensor.to(device) for tensor in sup_predicted_locs], dim=0)
             sup_predicted_scores = torch.cat([tensor.to(device) for tensor in sup_predicted_scores], dim=0)
