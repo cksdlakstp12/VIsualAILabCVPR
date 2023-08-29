@@ -192,12 +192,12 @@ def train_epoch(model: SSD300,
         
         print(type(sup_predicted_locs))
         print(sup_predicted_locs)
-        
-        sup_predicted_locs = torch.FloatTensor(sup_predicted_locs).to(device)
-        sup_predicted_scores = torch.FloatTensor(sup_predicted_locs).to(device)
-        un_predicted_locs = torch.FloatTensor(sup_predicted_locs).to(device)
-        un_predicted_scores = torch.FloatTensor(sup_predicted_locs).to(device)
 
+        sup_predicted_locs = [tensor.to(device) for tensor in sup_predicted_locs]
+        sup_predicted_scores = [tensor.to(device) for tensor in sup_predicted_scores]
+        un_predicted_locs = [tensor.to(device) for tensor in un_predicted_locs]
+        un_predicted_scores = [tensor.to(device) for tensor in un_predicted_scores]
+        
         if len(sup_vis_box) > 0:
             # vis_Loss
             #print("loss vis box :", vis_box)
