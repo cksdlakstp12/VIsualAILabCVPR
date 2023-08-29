@@ -20,9 +20,6 @@ from model import SSD300
 
 
 def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_score: float = 0.1) -> Dict:
-    print(dataloader.dataset)
-    print(type(dataloader.dataset))
-    print(type(dataloader.dataset) is KAISTPedWS)
     """Validate the model during an epoch
 
     Parameters
@@ -51,8 +48,10 @@ def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_scor
     results = dict()
     with torch.no_grad():
         for i, blob in enumerate(tqdm(dataloader, desc='Evaluating')):
-            # if type(dataloader.dataset) is KAISTPedWS
-            image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices, _ = blob
+            if type(dataloader.dataset) is KAISTPedWS:
+                image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices, _ = blob
+            else:
+                image_vis, image_lwir, _, _, indices = blob
 
             image_vis = image_vis.to(device)
             image_lwir = image_lwir.to(device)
