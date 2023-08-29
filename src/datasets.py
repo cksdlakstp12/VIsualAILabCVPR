@@ -59,7 +59,7 @@ class KAISTPed(data.Dataset):
     def __getitem__(self, index): 
 
         vis, lwir, boxes, labels = self.pull_item(index)
-        return vis, lwir, boxes, labels, torch.ones(1,dtype=torch.int)*index  
+        return vis, lwir, boxes, labels, torch.ones(1,dtype=torch.int)*index, None
 
     def pull_item(self, index):
         

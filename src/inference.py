@@ -20,6 +20,8 @@ from model import SSD300
 
 
 def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_score: float = 0.1) -> Dict:
+    print(DataLoader.dataset)
+    print(type(DataLoader.dataset))
     """Validate the model during an epoch
 
     Parameters
