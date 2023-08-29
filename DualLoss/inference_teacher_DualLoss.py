@@ -4,21 +4,45 @@ from pathlib import Path
 from tqdm import tqdm
 from typing import Dict, Tuple
 import argparse
-import config
+import config_teacher as config
 import numpy as np
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from datasets import KAISTPed
+from datasets_teacher_test import KAISTPed
 from utils.transforms import FusionDeadZone
 from utils.evaluation_script import evaluate
 from vis import visualize
 
-from model import SSD300
+from model_teacher import SSD300
 
+"""
+def run_inference(FDZ, model_path, result_dir, vis=False):
+    fdz_case = FDZ.lower()
+    model_path_obj = Path(model_path).stem.replace('.', '_')
 
+    # Run inference to get detection results
+    os.makedirs(result_dir, exist_ok=True)
+    result_filename = opj(result_dir, f'{fdz_case}_{model_path_obj}_TEST_det')
+
+    # Run inference
+    results = run_inference(model_path, fdz_case)
+
+    # Save results
+    save_results(results, result_filename)
+
+    # Eval results
+    phase = "Multispectral"
+    evaluate(config.PATH.JSON_GT_FILE, result_filename + '.txt', phase) 
+    
+    # Visualizing
+    if vis:
+        vis_dir = opj(result_dir, 'vis', model_path_obj, fdz_case)
+        os.makedirs(vis_dir, exist_ok=True)
+        visualize(result_filename + '.txt', vis_dir, fdz_case)
+"""
 
 
 def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_score: float = 0.1) -> Dict:
@@ -40,7 +64,7 @@ def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_scor
     Dict
         A Dict of numpy arrays (K x 5: xywh + score) for given image_id key
     """
-
+    print("\n\n val epoch \n\n")
     model.eval()
 
     height, width = input_size

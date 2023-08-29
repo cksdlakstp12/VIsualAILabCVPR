@@ -10,9 +10,10 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 
-from datasets import KAISTPed
+from datasets import KAISTPed, KAISTPedWS
 from inference import val_epoch, save_results
 from model import SSD300, MultiBoxLoss
+from train_utils import *
 from utils import utils
 from utils.evaluation_script import evaluate
 
@@ -21,15 +22,13 @@ torch.backends.cudnn.benchmark = False
 # random seed fix 
 utils.set_seed(seed=9)
 
-print("device count :", torch.cuda.device_count())
-print("available :", torch.cuda.is_available())
-
-
 def main():
     """Train and validate a model"""
 
     # TODO(sohwang): why do we need these global variables?
     # global epochs_since_improvement, start_epoch, label_map, best_loss, epoch
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     args = config.args
     train_conf = config.train
@@ -38,57 +37,23 @@ def main():
     epochs = train_conf.epochs
     phase = "Multispectral"
 
-    # Initialize model or load checkpoint
-    if checkpoint is None:
-        model = SSD300(n_classes=args.n_classes)
-        # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
-        biases = list()
-        not_biases = list()
-        for param_name, param in model.named_parameters():
-            if param.requires_grad:
-                if param_name.endswith('.bias'):
-                    biases.append(param)
-                else:
-                    not_biases.append(param)
-        optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * train_conf.lr},
-                                            {'params': not_biases}],
-                                    lr=train_conf.lr,
-                                    momentum=train_conf.momentum,
-                                    weight_decay=train_conf.weight_decay,
-                                    nesterov=False)
-
-        optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                               milestones=[int(epochs * 0.5), int(epochs * 0.9)],
-                                                               gamma=0.1)
-
-    else:
-        checkpoint = torch.load(checkpoint)
-        start_epoch = checkpoint['epoch'] + 1
-        train_loss = checkpoint['loss']
-        print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' % (start_epoch, train_loss))
-        model = checkpoint['model']
-        optimizer = checkpoint['optimizer']
-        optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(epochs * 0.5)], gamma=0.1)
+    # Initialize student model and load teacher checkpoint
+    s_model, s_optimizer, s_optim_scheduler, \
+    t_model, t_optimizer, t_optim_scheduler = load_SoftTeacher(config)
 
     # Move to default device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    model = nn.DataParallel(model)
+    s_model = s_model.to(device)
+    s_model = nn.DataParallel(s_model)
+    t_model = t_model.to(device)
+    t_model = nn.DataParallel(t_model)
 
-    criterion = MultiBoxLoss(priors_cxcy=model.module.priors_cxcy).to(device)
+    criterion = MultiBoxLoss(priors_cxcy=s_model.module.priors_cxcy).to(device)
 
-    train_dataset = KAISTPed(args, condition='train')
-    train_loader = DataLoader(train_dataset, batch_size=train_conf.batch_size, shuffle=True,
-                              num_workers=config.dataset.workers,
-                              collate_fn=train_dataset.collate_fn,
-                              pin_memory=True)  # note that we're passing the collate function here
+    # create dataloader
+    weak_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="weak", condition="train")
+    strong_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="strong", condition="train")
+    test_loader = create_dataloader(args, KAISTPed, condition="test")
 
-    test_dataset = KAISTPed(args, condition='test')
-    test_batch_size = args["test"].eval_batch_size * torch.cuda.device_count()
-    test_loader = DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False,
-                             num_workers=config.dataset.workers,
-                             collate_fn=test_dataset.collate_fn,
-                             pin_memory=True)
     # Set job directory
     if args.exp_time is None:
         args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm')
@@ -107,24 +72,26 @@ def main():
     for epoch in range(start_epoch, epochs):
         # One epoch's training
         logger.info('#' * 20 + f' << Epoch {epoch:3d} >> ' + '#' * 20)
-        train_loss = train_epoch(model=model,
-                                 dataloader=train_loader,
+        t_infer_result = val_epoch(t_model, weak_aug_loader, config.test.input_size, min_score=0.1)
+
+        s_train_loss = train_epoch(model=s_model,
+                                 dataloader=strong_aug_loader,
                                  criterion=criterion,
-                                 optimizer=optimizer,
+                                 optimizer=s_optimizer,
                                  logger=logger,
                                  **kwargs)
 
-        optim_scheduler.step()
+        s_optim_scheduler.step()
 
         # Save checkpoint
-        utils.save_checkpoint(epoch, model.module, optimizer, train_loss, jobs_dir)
+        utils.save_checkpoint(epoch, s_model.module, s_optimizer, s_train_loss, jobs_dir)
         
-        if epoch >= 15:
+        if epoch >= 0:
             result_filename = os.path.join(jobs_dir, f'Epoch{epoch:03d}_test_det.txt')
 
             # High min_score setting is important to guarantee reasonable number of detections
             # Otherwise, you might see OOM in validation phase at early training epoch
-            results = val_epoch(model, test_loader, config.test.input_size, min_score=0.1)
+            results = val_epoch(s_model, test_loader, config.test.input_size, min_score=0.1)
 
             save_results(results, result_filename)
             
@@ -172,7 +139,7 @@ def train_epoch(model: SSD300,
     start = time.time()
     
     # Batches
-    for batch_idx, (image_vis, image_lwir, boxes, labels, _) in enumerate(dataloader):
+    for batch_idx, (image_vis, image_lwir, vis_box, lwir_box, vis_labels, lwir_labels, _) in enumerate(dataloader):
         data_time.update(time.time() - start)
 
         # Move to default device
@@ -185,8 +152,15 @@ def train_epoch(model: SSD300,
         # Forward prop.
         predicted_locs, predicted_scores = model(image_vis, image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
 
-        # Loss
-        loss, cls_loss, loc_loss, n_positives = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
+        # vis_Loss
+        #print("loss vis box :", vis_box)
+        vis_loss, vis_cls_loss, vis_loc_loss, vis_n_positives = criterion(predicted_locs, predicted_scores, vis_box, vis_labels)  # scalar
+        # lwir_Loss
+        #print("loss lwir box :", lwir_box)
+        lwir_loss, lwir_cls_loss, lwir_loc_loss, lwir_n_positives = criterion(predicted_locs, predicted_scores, lwir_box, lwir_labels)
+
+        loss = vis_cls_loss+ vis_loc_loss + lwir_cls_loss + lwir_loc_loss
+
 
         # Backward prop.
         optimizer.zero_grad()
@@ -216,11 +190,12 @@ def train_epoch(model: SSD300,
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                        'num of Positive {Positive}\t'.format(batch_idx, len(dataloader),
+                        'num of Positive {vis_Positive} {lwir_Positive}\t'.format(batch_idx, len(dataloader),
                                                               batch_time=batch_time,
                                                               data_time=data_time,
                                                               loss=losses_sum,
-                                                              Positive=n_positives))
+                                                              vis_Positive=vis_n_positives,
+                                                              lwir_Positive=lwir_n_positives))
 
     return losses_sum.avg
 

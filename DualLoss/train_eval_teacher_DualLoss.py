@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Dict
-import config
+import config_teacher as config_case1
 import logging
 import numpy as np
 import os
@@ -10,9 +10,9 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 
-from datasets import KAISTPed
-from inference import val_epoch, save_results
-from model import SSD300, MultiBoxLoss
+from datasets_teacher_test import KAISTPed
+from inference_teacher_test import val_epoch, save_results
+from model_teacher import SSD300, MultiBoxLoss
 from utils import utils
 from utils.evaluation_script import evaluate
 
@@ -21,9 +21,6 @@ torch.backends.cudnn.benchmark = False
 # random seed fix 
 utils.set_seed(seed=9)
 
-print("device count :", torch.cuda.device_count())
-print("available :", torch.cuda.is_available())
-
 
 def main():
     """Train and validate a model"""
@@ -31,8 +28,8 @@ def main():
     # TODO(sohwang): why do we need these global variables?
     # global epochs_since_improvement, start_epoch, label_map, best_loss, epoch
 
-    args = config.args
-    train_conf = config.train
+    args = config_case1.args
+    train_conf = config_case1.train
     checkpoint = train_conf.checkpoint
     start_epoch = train_conf.start_epoch
     epochs = train_conf.epochs
@@ -40,6 +37,7 @@ def main():
 
     # Initialize model or load checkpoint
     if checkpoint is None:
+        print("\ncheck Point is None\n")
         model = SSD300(n_classes=args.n_classes)
         # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
         biases = list()
@@ -62,8 +60,10 @@ def main():
                                                                gamma=0.1)
 
     else:
+        print(f"\ncheck point is {checkpoint}\n")
         checkpoint = torch.load(checkpoint)
-        start_epoch = checkpoint['epoch'] + 1
+        #start_epoch = checkpoint['epoch'] + 1
+        start_epoch = 0
         train_loss = checkpoint['loss']
         print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' % (start_epoch, train_loss))
         model = checkpoint['model']
@@ -79,23 +79,23 @@ def main():
 
     train_dataset = KAISTPed(args, condition='train')
     train_loader = DataLoader(train_dataset, batch_size=train_conf.batch_size, shuffle=True,
-                              num_workers=config.dataset.workers,
+                              num_workers=config_case1.dataset.workers,
                               collate_fn=train_dataset.collate_fn,
                               pin_memory=True)  # note that we're passing the collate function here
 
     test_dataset = KAISTPed(args, condition='test')
     test_batch_size = args["test"].eval_batch_size * torch.cuda.device_count()
     test_loader = DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False,
-                             num_workers=config.dataset.workers,
+                             num_workers=config_case1.dataset.workers,
                              collate_fn=test_dataset.collate_fn,
                              pin_memory=True)
     # Set job directory
     if args.exp_time is None:
-        args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm')
+        args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm%Ss')
     
-    # TODO(sohwang): should config.exp_name be updated from command line argument?
+    # TODO(sohwang): should config_case1.exp_name be updated from command line argument?
     exp_name = ('_' + args.exp_name) if args.exp_name else '_'
-    jobs_dir = os.path.join('jobs', args.exp_time + exp_name)
+    jobs_dir = os.path.join('../jobs3', args.exp_time + exp_name)
     os.makedirs(jobs_dir, exist_ok=True)
     args.jobs_dir = jobs_dir
 
@@ -119,16 +119,16 @@ def main():
         # Save checkpoint
         utils.save_checkpoint(epoch, model.module, optimizer, train_loss, jobs_dir)
         
-        if epoch >= 15:
+        if epoch >= 0:
             result_filename = os.path.join(jobs_dir, f'Epoch{epoch:03d}_test_det.txt')
 
             # High min_score setting is important to guarantee reasonable number of detections
             # Otherwise, you might see OOM in validation phase at early training epoch
-            results = val_epoch(model, test_loader, config.test.input_size, min_score=0.1)
+            results = val_epoch(model, test_loader, config_case1.test.input_size, min_score=0.1)
 
             save_results(results, result_filename)
             
-            evaluate(config.PATH.JSON_GT_FILE, result_filename, phase) 
+            evaluate(config_case1.PATH.JSON_GT_FILE, result_filename, phase) 
 
 
 def train_epoch(model: SSD300,
@@ -170,31 +170,42 @@ def train_epoch(model: SSD300,
     # losses_cls = utils.AverageMeter()  # loss_cls
 
     start = time.time()
-    
+
     # Batches
-    for batch_idx, (image_vis, image_lwir, boxes, labels, _) in enumerate(dataloader):
+    for batch_idx, (image_vis, image_lwir, vis_box, lwir_box, vis_labels, lwir_labels, _) in enumerate(dataloader):
         data_time.update(time.time() - start)
 
         # Move to default device
         image_vis = image_vis.to(device)
         image_lwir = image_lwir.to(device)
 
-        boxes = [box.to(device) for box in boxes]
-        labels = [label.to(device) for label in labels]
+        vis_box = [box.to(device) for box in vis_box]
+        lwir_box = [box.to(device) for box in lwir_box]
+        #print("vis_box :", vis_box)
+        #print("lwir_box :", lwir_box)
+        #boxes = [box.to(device) for box in boxes]
+        vis_labels = [label.to(device) for label in vis_labels]
+        lwir_labels = [label.to(device) for label in lwir_labels]
 
         # Forward prop.
         predicted_locs, predicted_scores = model(image_vis, image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
 
-        # Loss
-        loss, cls_loss, loc_loss, n_positives = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
+        # vis_Loss
+        #print("loss vis box :", vis_box)
+        vis_loss, vis_cls_loss, vis_loc_loss, vis_n_positives = criterion(predicted_locs, predicted_scores, vis_box, vis_labels)  # scalar
+        # lwir_Loss
+        #print("loss lwir box :", lwir_box)
+        lwir_loss, lwir_cls_loss, lwir_loc_loss, lwir_n_positives = criterion(predicted_locs, predicted_scores, lwir_box, lwir_labels)
+
+        loss = vis_cls_loss+ vis_loc_loss + lwir_cls_loss + lwir_loc_loss
 
         # Backward prop.
         optimizer.zero_grad()
         loss.backward()
 
         # TODO(sohwang): Do we need this?
-        if np.isnan(loss.item()):
-            loss, cls_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
+        #if np.isnan(loss.item()):
+            #loss, cls_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
 
         # Clip gradients, if necessary
         if kwargs.get('grad_clip', None):
@@ -216,11 +227,12 @@ def train_epoch(model: SSD300,
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                        'num of Positive {Positive}\t'.format(batch_idx, len(dataloader),
+                        'num of Positive {vis_Positive} {lwir_Positive}\t'.format(batch_idx, len(dataloader),
                                                               batch_time=batch_time,
                                                               data_time=data_time,
                                                               loss=losses_sum,
-                                                              Positive=n_positives))
+                                                              vis_Positive=vis_n_positives,
+                                                              lwir_Positive=lwir_n_positives))
 
     return losses_sum.avg
 
