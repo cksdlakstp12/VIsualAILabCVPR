@@ -281,6 +281,7 @@ class KAISTPedWS(KAISTPed):
         return vis, lwir, vis_box,lwir_box, vis_labels,lwir_labels, torch.ones(1,dtype=torch.int)*index, is_annotation
 
     def pull_item(self, index):
+        global randomHorizontalFlipProp
         is_annotation = True
 
         frame_id = self.ids[index]
@@ -288,12 +289,10 @@ class KAISTPedWS(KAISTPed):
         set_id, vid_id, img_id = frame_id[-1]
 
         if self.aug_mode == "weak":
-            global randomHorizontalFlipProp
             randomHorizontalFlipProp = random.random()
             with open(args.props_path, "a") as f:
                 f.write(f"{index},{randomHorizontalFlipProp}\n")
         else:
-            global randomHorizontalFlipProp
             randomHorizontalFlipProp = self.props[index]
 
         vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id ))
