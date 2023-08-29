@@ -8,7 +8,6 @@ import numpy as np
 from utils.transforms import RandomErasing
 from utils.transforms import *
 
-
 # Dataset path
 PATH = edict()
 
@@ -43,6 +42,8 @@ train.grad_clip = None  # clip if gradients are exploding, which may happen at l
 train.print_freq = 10   
 
 train.annotation = "AR-CNN" # AR-CNN, Sanitize, Original 
+
+train.random_seed = 42
 
 # test & eval
 test = edict()
@@ -153,6 +154,9 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
                                     ])
 
 ## for soft teacher
+args.props_path = "./props.txt"
+args.txt_path = "./imageSets/90percents.txt"
+args.tau = 0.0001
 args["train"].weak_transform = Compose([ RandomHorizontalFlip(p=0.5),
                                         ToTensor()
                                     ], args=args)

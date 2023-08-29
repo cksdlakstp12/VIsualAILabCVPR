@@ -9,6 +9,7 @@ import time
 from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from datasets import KAISTPed, KAISTPedWS
 from inference import val_epoch, save_results
@@ -50,8 +51,8 @@ def main():
     criterion = MultiBoxLoss(priors_cxcy=s_model.module.priors_cxcy).to(device)
 
     # create dataloader
-    weak_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="weak", condition="train")
-    strong_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="strong", condition="train")
+    weak_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="weak", condition="train", seed=train_conf.random_seed)
+    strong_aug_loader = create_dataloader(args, KAISTPedWS, aug_mode="strong", condition="train", seed=train_conf.random_seed)
     test_loader = create_dataloader(args, KAISTPed, condition="test")
 
     # Set job directory
@@ -72,13 +73,19 @@ def main():
     for epoch in range(start_epoch, epochs):
         # One epoch's training
         logger.info('#' * 20 + f' << Epoch {epoch:3d} >> ' + '#' * 20)
-        t_infer_result = val_epoch(t_model, weak_aug_loader, config.test.input_size, min_score=0.1)
+        t_infer_result = val_epoch(t_model, weak_aug_loader, 
+                                   config.test.input_size, 
+                                   min_score=0.1)
+        result_filename = os.path.join(jobs_dir, f'teacher_inferece_Epoch{epoch:3d}.txt')
+        save_results(results, result_filename)
 
+        strong_aug_loader.load_teacher_inferece(args.txt_path, result_filename)
         s_train_loss = train_epoch(model=s_model,
                                  dataloader=strong_aug_loader,
                                  criterion=criterion,
                                  optimizer=s_optimizer,
                                  logger=logger,
+                                 teachingValue=t_infer_result,
                                  **kwargs)
 
         s_optim_scheduler.step()
@@ -86,6 +93,8 @@ def main():
         # Save checkpoint
         utils.save_checkpoint(epoch, s_model.module, s_optimizer, s_train_loss, jobs_dir)
         
+        soft_update(t_model, s_model, args.tau)
+
         if epoch >= 0:
             result_filename = os.path.join(jobs_dir, f'Epoch{epoch:03d}_test_det.txt')
 
@@ -103,6 +112,7 @@ def train_epoch(model: SSD300,
                 criterion: MultiBoxLoss,
                 optimizer: torch.optim.Optimizer,
                 logger: logging.Logger,
+                teachingValue: list,
                 **kwargs: Dict) -> float:
     """Train the model during an epoch
 
@@ -137,38 +147,74 @@ def train_epoch(model: SSD300,
     # losses_cls = utils.AverageMeter()  # loss_cls
 
     start = time.time()
-    
+
     # Batches
-    for batch_idx, (image_vis, image_lwir, vis_box, lwir_box, vis_labels, lwir_labels, _) in enumerate(dataloader):
+    for batch_idx, (image_vis, image_lwir, vis_box, lwir_box, vis_labels, lwir_labels, _, is_anno) in enumerate(dataloader):
         data_time.update(time.time() - start)
 
         # Move to default device
         image_vis = image_vis.to(device)
         image_lwir = image_lwir.to(device)
 
-        boxes = [box.to(device) for box in boxes]
-        labels = [label.to(device) for label in labels]
-
         # Forward prop.
         predicted_locs, predicted_scores = model(image_vis, image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
 
-        # vis_Loss
-        #print("loss vis box :", vis_box)
-        vis_loss, vis_cls_loss, vis_loc_loss, vis_n_positives = criterion(predicted_locs, predicted_scores, vis_box, vis_labels)  # scalar
-        # lwir_Loss
-        #print("loss lwir box :", lwir_box)
-        lwir_loss, lwir_cls_loss, lwir_loc_loss, lwir_n_positives = criterion(predicted_locs, predicted_scores, lwir_box, lwir_labels)
+        sup_vis_box = list()
+        sup_lwir_box = list()
+        sup_vis_labels = list()
+        sup_lwir_labels = list()
+        sup_predicted_locs = list()
+        sup_predicted_scores = list()
 
-        loss = vis_cls_loss+ vis_loc_loss + lwir_cls_loss + lwir_loc_loss
+        un_vis_box = list()
+        un_lwir_box = list()
+        un_vis_labels = list()
+        un_lwir_labels = list()
+        un_predicted_scores = list()
+        un_predicted_locs = list()
 
+        for anno, vb, lb, vl, ll, pl, ps in zip(is_anno, vis_box, lwir_box, vis_labels, lwir_labels, predicted_locs, predicted_scores):
+            if anno:
+                sup_vis_box.append(vb.to(device))
+                sup_lwir_box.append(lb.to(device))
+                sup_vis_labels.append(vl.to(device))
+                sup_lwir_labels.append(ll.to(device))
+                sup_predicted_locs.append(pl)
+                sup_predicted_scores.append(ps)
+            else:
+                un_vis_box.append(vb.to(device))
+                un_lwir_box.append(lb.to(device))
+                un_vis_labels.append(vl.to(device))
+                un_lwir_labels.append(ll.to(device))
+                un_predicted_locs.append(pl)
+                un_predicted_scores.append(ps)
+
+        if len(sup_vis_box) > 0:
+            # vis_Loss
+            #print("loss vis box :", vis_box)
+            sup_vis_loss, sup_vis_cls_loss, sup_vis_loc_loss, sup_vis_n_positives = criterion(sup_predicted_locs, sup_predicted_scores, sup_vis_box, sup_vis_labels)  # scalar
+            # lwir_Loss
+            #print("loss lwir box :", lwir_box)
+            sup_lwir_loss, sup_lwir_cls_loss, sup_lwir_loc_loss, sup_lwir_n_positives = criterion(sup_predicted_locs, sup_predicted_scores, sup_lwir_box, sup_lwir_labels)
+
+        if len(un_vis_box) > 0:
+            # vis_Loss
+            #print("loss vis box :", vis_box)
+            un_vis_loss, un_vis_cls_loss, un_vis_loc_loss, un_vis_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_vis_box, un_vis_labels)  # scalar
+            # lwir_Loss
+            #print("loss lwir box :", lwir_box)
+            un_lwir_loss, un_lwir_cls_loss, un_lwir_loc_loss, un_lwir_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_lwir_box, un_lwir_labels)
+
+        loss = sup_vis_loss+ sup_lwir_loss + un_vis_loss + un_lwir_loss + F.mse_loss(un_vis_cls_loss, un_lwir_cls_loss) + F.mse_loss(un_vis_loc_loss, un_lwir_loc_loss)
+        #loss = un_vis + un_ir + sup_vis + sup_ir + mse(un_vis_cls, un_ir_cls) + mse(un_vis_loc, un_ir_loc) 
 
         # Backward prop.
         optimizer.zero_grad()
         loss.backward()
 
         # TODO(sohwang): Do we need this?
-        if np.isnan(loss.item()):
-            loss, cls_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
+        #if np.isnan(loss.item()):
+            #loss, cls_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
 
         # Clip gradients, if necessary
         if kwargs.get('grad_clip', None):
@@ -190,12 +236,14 @@ def train_epoch(model: SSD300,
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                        'num of Positive {vis_Positive} {lwir_Positive}\t'.format(batch_idx, len(dataloader),
+                        'num of Positive {sup_vis_n_positives} {sup_lwir_n_positives} {un_vis_n_positives} {un_lwir_n_positives}\t'.format(batch_idx, len(dataloader),
                                                               batch_time=batch_time,
                                                               data_time=data_time,
                                                               loss=losses_sum,
-                                                              vis_Positive=vis_n_positives,
-                                                              lwir_Positive=lwir_n_positives))
+                                                              sup_vis_n_positives=sup_vis_n_positives,
+                                                              sup_lwir_n_positives=sup_lwir_n_positives,
+                                                              un_vis_n_positives=un_vis_n_positives,
+                                                              un_lwir_n_positives=un_lwir_n_positives))
 
     return losses_sum.avg
 

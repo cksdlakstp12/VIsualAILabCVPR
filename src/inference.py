@@ -11,14 +11,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from datasets import KAISTPed
+from datasets import KAISTPed, KAISTPedWS
 from utils.transforms import FusionDeadZone
 from utils.evaluation_script import evaluate
 from vis import visualize
 
 from model import SSD300
-
-
 
 
 def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_score: float = 0.1) -> Dict:
@@ -50,7 +48,7 @@ def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_scor
     results = dict()
     with torch.no_grad():
         for i, blob in enumerate(tqdm(dataloader, desc='Evaluating')):
-            image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices = blob
+            image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices, _ = blob
 
             image_vis = image_vis.to(device)
             image_lwir = image_lwir.to(device)
@@ -75,8 +73,9 @@ def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_scor
                 xywh_np = xyxy_np
                 xywh_np[:, 2] -= xywh_np[:, 0]
                 xywh_np[:, 3] -= xywh_np[:, 1]
-
+                
                 results[image_id.item() + 1] = np.hstack([xywh_np, scores_np])
+
     return results
 
 

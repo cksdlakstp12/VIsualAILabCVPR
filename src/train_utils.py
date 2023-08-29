@@ -2,6 +2,8 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 
+import numpy as np
+
 from model import SSD300
 
 def initialize_state(n_classes, train_conf):
@@ -62,15 +64,28 @@ def load_SoftTeacher(config):
 
 def create_dataloader(config, dataset_class, **kwargs):
     dataset = dataset_class(config.args, **kwargs)
-    if kwargs["condition"] == "test":
+    if kwargs["condition"] == "train":
+        loader = DataLoader(dataset, batch_size=config.train.batch_size, shuffle=True,
+                              num_workers=config.dataset.workers,
+                              collate_fn=dataset.collate_fn,
+                              worker_init_fn = lambda id: np.random.seed(kwargs["seed"]),
+                              pin_memory=True)  # note that we're passing the collate function here
+    else:
         test_batch_size = config.args["test"].eval_batch_size * torch.cuda.device_count()
         loader = DataLoader(dataset, batch_size=test_batch_size, shuffle=False,
                               num_workers=config.dataset.workers,
                               collate_fn=dataset.collate_fn,
                               pin_memory=True)  # note that we're passing the collate function here
-    else:
-        loader = DataLoader(dataset, batch_size=config.train.batch_size, shuffle=True,
-                              num_workers=config.dataset.workers,
-                              collate_fn=dataset.collate_fn,
-                              pin_memory=True)  # note that we're passing the collate function here
     return loader
+
+def soft_update(teacher_model, student_model, tau):
+    """
+    Soft update model parameters.
+    θ_teacher = τ*θ_student + (1 - τ)*θ_teacher
+
+    :param teacher_model: PyTorch model (Teacher)
+    :param student_model: PyTorch model (Student)
+    :param tau: interpolation parameter (0.001 in your case)
+    """
+    for teacher_param, student_param in zip(teacher_model.parameters(), student_model.parameters()):
+        teacher_param.data.copy_(tau*student_param.data + (1.0-tau)*teacher_param.data)

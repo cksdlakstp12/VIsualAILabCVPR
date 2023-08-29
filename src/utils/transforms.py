@@ -4,6 +4,8 @@ import os
 import math
 import random
 
+
+
 import torch    
 from PIL import Image, ImageOps, ImageChops, ImageEnhance
 try:
@@ -654,7 +656,7 @@ class RandomCrop(object):
     def __repr__(self):
         return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
 
-
+randomHorizontalFlipProp = random.random()
 class RandomHorizontalFlip(object):
     """Horizontally flip the given PIL Image randomly with a given probability.
     Args:
@@ -671,7 +673,7 @@ class RandomHorizontalFlip(object):
         Returns:
             PIL Image: Randomly flipped image.
         """
-        if random.random() < self.p:
+        if randomHorizontalFlipProp < self.p:
             
             img = F.hflip(img)
             ann = F.hflip(ann) if ann is not None else None
@@ -680,8 +682,8 @@ class RandomHorizontalFlip(object):
                 #print("horizon 정상작동")
                 box_vis = F.box_flip(box_vis)
                 box_lwir = F.box_flip(box_lwir)       
-            else:
-                print("Dont flip")
+            #else:
+                #print("Dont flip")
                 #print("FLIPIPIPIPIP")
                 #print()
                 #print()
