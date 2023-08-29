@@ -180,15 +180,15 @@ def train_epoch(model: SSD300,
                 sup_lwir_box.append(lb.to(device))
                 sup_vis_labels.append(vl.to(device))
                 sup_lwir_labels.append(ll.to(device))
-                sup_predicted_locs = torch.cat([sup_predicted_locs.unsqueeze(0).to(device), pl], dim=0)
-                sup_predicted_scores = torch.cat([sup_predicted_scores.unsqueeze(0).to(device), ps], dim=0)
+                sup_predicted_locs = torch.cat([sup_predicted_locs, pl.unsqueeze(0).to(device)], dim=0)
+                sup_predicted_scores = torch.cat([sup_predicted_scores, ps.unsqueeze(0).to(device)], dim=0)
             else:
                 un_vis_box.append(vb.to(device))
                 un_lwir_box.append(lb.to(device))
                 un_vis_labels.append(vl.to(device))
                 un_lwir_labels.append(ll.to(device))
-                un_predicted_locs = torch.cat([un_predicted_locs.unsqueeze(0).to(device), pl], dim=0)
-                un_predicted_scores = torch.cat([un_predicted_scores.unsqueeze(0).to(device), ps], dim=0)
+                un_predicted_locs = torch.cat([un_predicted_locs, pl.unsqueeze(0).to(device)], dim=0)
+                un_predicted_scores = torch.cat([un_predicted_scores, ps.unsqueeze(0).to(device)], dim=0)
         
         # if len(sup_predicted_locs) > 0 and len(sup_predicted_scores) > 0:
         #     sup_predicted_locs = torch.cat([tensor.to(device) for tensor in sup_predicted_locs], dim=0)
