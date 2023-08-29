@@ -79,11 +79,11 @@ def create_dataloader(config, dataset_class, **kwargs):
 
 def converter(originpath, changepath, wantname):
     # Loading the 90percents.txt file and creating a dictionary where keys are the index
-    with open(f'{originpath}', 'r') as f:
+    with open(originpath, 'r') as f:
         data_90 = {idx+1: line.strip() for idx, line in enumerate(f)}
 
     # Loading the test2.txt file
-    with open(f'{changepath}', 'r') as f:
+    with open(changepath, 'r') as f:
         data_test2 = f.readlines()
 
     # Replacing the first number of each line in test2.txt with corresponding line in 90percents.txt
@@ -95,7 +95,7 @@ def converter(originpath, changepath, wantname):
         data_test2_new.append(','.join(items))
 
     # Writing the new data into a new file
-    with open(f'{wantname}.txt', 'w') as f:
+    with open(wantname, 'w') as f:
         for line in data_test2_new:
             f.write(line)
 
