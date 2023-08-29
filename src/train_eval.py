@@ -190,7 +190,7 @@ def train_epoch(model: SSD300,
                 un_predicted_locs = torch.cat([un_predicted_locs, pl.unsqueeze(0).to(device)], dim=0)
                 un_predicted_scores = torch.cat([un_predicted_scores, ps.unsqueeze(0).to(device)], dim=0)
 
-        sup_loss, un_loss = torch.FloatTensor(0).to(device), torch.FloatTensor(0).to(device)
+        sup_loss, un_loss = torch.zeros(1)[0].to(device), torch.zeros(1)[0].to(device)
         print(sup_loss)
         print(un_loss)
         if len(sup_vis_box) > 0:
