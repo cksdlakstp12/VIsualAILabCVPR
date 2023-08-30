@@ -55,6 +55,9 @@ def main():
     strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWS, aug_mode="strong", condition="train")
     test_dataset, test_loader = create_dataloader(config, KAISTPed, condition="test")
 
+    # EMA Scheduler
+    ema_scheduler = EMAScheduler(config)
+
     # Set job directory
     if args.exp_time is None:
         args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm')
@@ -95,7 +98,7 @@ def main():
         # Save checkpoint
         utils.save_checkpoint(epoch, s_model.module, s_optimizer, s_train_loss, jobs_dir)
         
-        soft_update(t_model, s_model, args.tau)
+        soft_update(t_model, s_model, ema_scheduler.get_tau(epoch))
 
         if epoch >= 0:
             result_filename = os.path.join(jobs_dir, f'Epoch{epoch:03d}_test_det.txt')
@@ -229,24 +232,24 @@ def train_epoch(model: SSD300,
 
         # Print status
         if batch_idx % kwargs.get('print_freq', 10) == 0:
-            logger.info('Iteration: [{0}/{1}]\t'
-                        'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                        'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                        'sup_vis_loss {sup_vis_loss}\t'
-                        'sup_vis_cls_loss {sup_vis_cls_loss}\t'
-                        'sup_vis_loc_loss {sup_vis_loc_loss}\t'
-                        'sup_lwir_loss {sup_lwir_loss}\t'
-                        'sup_lwir_cls_loss {sup_lwir_cls_loss}\t'
-                        'sup_lwir_loc_loss {sup_lwir_loc_loss}\t'
-                        'un_vis_loss {un_vis_loss}\t'
-                        'un_vis_cls_loss {un_vis_cls_loss}\t'
-                        'un_vis_loc_loss {un_vis_loc_loss}\t'
-                        'un_lwir_loss {un_lwir_loss}\t'
-                        'un_lwir_cls_loss {un_lwir_cls_loss}\t'
-                        'un_lwir_loc_loss {un_lwir_loc_loss}\t'
-                        'is_anno {is_anno}\t'
-                        'num of Positive {sup_vis_n_positives} {sup_lwir_n_positives} {un_vis_n_positives} {un_lwir_n_positives}\t'.format(batch_idx, len(dataloader),
+            logger.info('Iteration: [{0}/{1}]\n'
+                        'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f}),\t'
+                        'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\n'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\n'
+                        'sup_vis_loss {sup_vis_loss},\t'
+                        'sup_vis_cls_loss {sup_vis_cls_loss},\t'
+                        'sup_vis_loc_loss {sup_vis_loc_loss}\n'
+                        'sup_lwir_loss {sup_lwir_loss},\t'
+                        'sup_lwir_cls_loss {sup_lwir_cls_loss},\t'
+                        'sup_lwir_loc_loss {sup_lwir_loc_loss}\n'
+                        'un_vis_loss {un_vis_loss},\t'
+                        'un_vis_cls_loss {un_vis_cls_loss},\t'
+                        'un_vis_loc_loss {un_vis_loc_loss}\n'
+                        'un_lwir_loss {un_lwir_loss},\t'
+                        'un_lwir_cls_loss {un_lwir_cls_loss},\t'
+                        'un_lwir_loc_loss {un_lwir_loc_loss}\n'
+                        'is_anno {is_anno}\n'
+                        'num of Positive {sup_vis_n_positives} {sup_lwir_n_positives} {un_vis_n_positives} {un_lwir_n_positives}\n\n'.format(batch_idx, len(dataloader),
                                                               batch_time=batch_time,
                                                               data_time=data_time,
                                                               loss=losses_sum,

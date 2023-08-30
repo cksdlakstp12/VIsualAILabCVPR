@@ -158,14 +158,24 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
 args.props_path = "./props.txt"
 args.cnvt_path = "./convert.txt"
 
-args.tau = 0.0001
 args["train"].weak_transform = Compose([ RandomHorizontalFlip(p=0.5),
-                                        ToTensor()
+                                         ToTensor(),
+                                         Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
+                                         Normalize(LWIR_MEAN, LWIR_STD, 'T')   
                                     ], args=args)
 args["train"].weak4strong_transform = Compose([ RandomHorizontalFlip(p=0.5)
                                     ], args=args)
 args["train"].strong_transform = Compose([ ColorJitter(0.3, 0.3, 0.3), 
-                                            ColorJitterLWIR(contrast=0.3),
-                                            ToTensor(),
-                                            RandomErasing(),
+                                           ColorJitterLWIR(contrast=0.3),
+                                           ToTensor(),
+                                           Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
+                                           Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
+                                           RandomErasing(),  
                                     ], args=args)
+
+ema = edict()
+ema.use_scheduler = True
+ema.tau = 0.0001 # it also be start_tau when using scheduler
+ema.scheduling_start_epoch = 0
+ema.max_tau = 0.1
+ema.min_tau = 0.0001

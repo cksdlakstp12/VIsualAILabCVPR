@@ -233,20 +233,12 @@ class KAISTPedWS(KAISTPed):
         self.strong_transform = args[condition].strong_transform 
         self.annotations = defaultdict(list)
 
-        if self.mode == "train":
-            self.ids = list()
-            for line in open(os.path.join('./imageSets', self.image_set)):
-                self.ids.append(('../data/kaist-rgbt/', line.strip().split('/')))
-                ##print(self.ids)
-            self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
-            self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
-        else:
-            self.ids = list()
-            for line in open(os.path.join('./imageSets', self.image_set)):
-                self.ids.append(('../data/kaist-rgbt/', line.strip().split('/')))
-                ##print(self.ids)
-            self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
-            self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
+        self.ids = list()
+        for line in open(os.path.join('./imageSets', self.image_set)):
+            self.ids.append(('../data/kaist-rgbt/', line.strip().split('/')))
+            ##print(self.ids)
+        self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
+        self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
 
     def load_teacher_inference(self):
         # Load annotations from file and store in a dictionary

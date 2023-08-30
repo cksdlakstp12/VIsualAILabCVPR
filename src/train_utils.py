@@ -110,3 +110,27 @@ def soft_update(teacher_model, student_model, tau):
     """
     for teacher_param, student_param in zip(teacher_model.parameters(), student_model.parameters()):
         teacher_param.data.copy_(tau*student_param.data + (1.0-tau)*teacher_param.data)
+
+class EMAScheduler():
+    def __init__(self, config):
+        self.use_scheduler = config.ema.use_scheduler
+        self.start_tau = config.ema.tau
+        self.scheduling_start_epoch = config.ema.scheduling_start_epoch
+        self.max_tau = config.ema.max_tau
+        self.min_tau = config.ema.min_tau
+        self.last_tau = config.ema.tau
+
+    @staticmethod
+    def calc_tau(epoch, tau):
+        return 0
+    
+    def get_tau(self, epoch):
+        if not self.use_scheduler:
+            return self.start_tau
+        else:
+            new_tau = EMAScheduler.calc_tau(epoch, self.last_tau)
+            if new_tau > self.max_tau: return self.max_tau
+            elif new_tau < self.min_tau: return self.min_tau
+            else:
+                self.last_tau = new_tau 
+                return new_tau
