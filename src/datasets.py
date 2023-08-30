@@ -226,6 +226,8 @@ class KAISTPedWS(KAISTPed):
         super().__init__(args, condition)
         self.pair = 1
         self.aug_mode = aug_mode
+        if aug_mode == "weak":
+            self.image_set = args[condition].teacher_img_set
         self.weak_transform = args[condition].weak_transform 
         self.weak4strong_transform = args[condition].weak4strong_transform 
         self.strong_transform = args[condition].strong_transform 
