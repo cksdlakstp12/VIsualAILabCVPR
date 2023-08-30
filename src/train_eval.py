@@ -79,7 +79,7 @@ def main():
                                    min_score=0.1)
         result_filename = os.path.join(jobs_dir, f'teacher_inferece_Epoch{epoch:3d}.txt')
         save_results(t_infer_result, result_filename)
-        converter(args.txt_path, result_filename, args.cnvt_path)
+        converter(train_conf.teacher_img_set, result_filename, args.cnvt_path)
 
         strong_aug_dataset.load_teacher_inference()
         s_train_loss = train_epoch(model=s_model,
