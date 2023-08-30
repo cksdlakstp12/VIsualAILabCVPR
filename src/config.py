@@ -24,6 +24,7 @@ train = edict()
 
 train.day = "all"
 train.img_set = f"Labeled_Unlabled_combine.txt"
+train.teacher_img_set = "./imageSets/Unlabeled_90.txt"
 
 train.checkpoint = None ## Load chekpoint
 
@@ -155,7 +156,6 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
 
 ## for soft teacher
 args.props_path = "./props.txt"
-args.txt_path = "./imageSets/Unlabeled_90.txt"
 args.cnvt_path = "./convert.txt"
 
 args.tau = 0.0001
