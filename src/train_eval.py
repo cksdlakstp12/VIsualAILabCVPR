@@ -233,10 +233,34 @@ def train_epoch(model: SSD300,
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        'sup_vis_loss {sup_vis_loss}'
+                        'sup_vis_cls_loss {sup_vis_cls_loss}'
+                        'sup_vis_loc_loss {sup_vis_loc_loss}'
+                        'sup_lwir_loss {sup_lwir_loss}'
+                        'sup_lwir_cls_loss {sup_lwir_cls_loss}'
+                        'sup_lwir_loc_loss {sup_lwir_loc_loss}'
+                        'un_vis_loss {un_vis_loss}'
+                        'un_vis_cls_loss {un_vis_cls_loss}'
+                        'un_vis_loc_loss {un_vis_loc_loss}'
+                        'un_lwir_loss {un_lwir_loss}'
+                        'un_lwir_cls_loss {un_lwir_cls_loss}'
+                        'un_lwir_loc_loss {un_lwir_loc_loss}'
                         'num of Positive {sup_vis_n_positives} {sup_lwir_n_positives} {un_vis_n_positives} {un_lwir_n_positives}\t'.format(batch_idx, len(dataloader),
                                                               batch_time=batch_time,
                                                               data_time=data_time,
                                                               loss=losses_sum,
+                                                              sup_vis_loss=sup_vis_loss,
+                                                              sup_vis_cls_loss=sup_vis_cls_loss,
+                                                              sup_vis_loc_loss=sup_vis_loc_loss,
+                                                              sup_lwir_loss=sup_lwir_loss,
+                                                              sup_lwir_cls_loss=sup_lwir_cls_loss,
+                                                              sup_lwir_loc_loss=sup_lwir_loc_loss,
+                                                              un_vis_loss=un_vis_loss,
+                                                              un_vis_cls_loss=un_vis_cls_loss,
+                                                              un_vis_loc_loss=un_vis_loc_loss,
+                                                              un_lwir_loss=un_lwir_loss,
+                                                              un_lwir_cls_loss=un_lwir_cls_loss,
+                                                              un_lwir_loc_loss=un_lwir_loc_loss,
                                                               sup_vis_n_positives=sup_vis_n_positives,
                                                               sup_lwir_n_positives=sup_lwir_n_positives,
                                                               un_vis_n_positives=un_vis_n_positives,

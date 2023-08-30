@@ -79,7 +79,7 @@ def create_dataloader(config, dataset_class, **kwargs):
 
 def converter(originpath, changepath, wantname):
     # Loading the 90percents.txt file and creating a dictionary where keys are the index
-    with open(originpath, 'r') as f:
+    with open("./imageSets/" + originpath, 'r') as f:
         data_90 = {idx+1: line.strip() for idx, line in enumerate(f)}
 
     # Loading the test2.txt file
