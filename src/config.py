@@ -24,7 +24,7 @@ train = edict()
 
 train.day = "all"
 train.img_set = f"Labeled_Unlabled_combine.txt"
-train.teacher_img_set = "./imageSets/Unlabeled_90.txt"
+train.teacher_img_set = "Unlabeled_90.txt"
 
 train.checkpoint = None ## Load chekpoint
 
