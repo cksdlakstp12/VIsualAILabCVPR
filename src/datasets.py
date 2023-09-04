@@ -262,7 +262,7 @@ class KAISTPedWS(KAISTPed):
         self.annotations = defaultdict(list)
         for image_id, detections in sorted(results.items(), key=lambda x: x[0]):
             for x, y, w, h, score in detections:
-                img_id = self.teacher_image_set[image_id]
+                img_id = self.teacher_image_ids[image_id]
                 self.annotations[img_id].append([float(x), float(y), float(w), float(h), float(score)])
     
     def load_propFile(self):
