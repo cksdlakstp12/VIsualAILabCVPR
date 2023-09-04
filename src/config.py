@@ -5,7 +5,7 @@ from easydict import EasyDict as edict
 import torch
 import numpy as np
 
-from utils.transforms import RandomErasing, ComposeForST
+from utils.transforms import RandomErasing, ComposeForST, RandomHorizontalFlipForST
 from utils.transforms import *
 
 # Dataset path
@@ -162,19 +162,34 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
                                     ])
 
 ## for soft teacher
-args["train"].weak_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
+args["train"].weak_transform = ComposeForST([ RandomHorizontalFlipForST(p=0.5),
                                          ToTensor(),
                                          Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
                                          Normalize(LWIR_MEAN, LWIR_STD, 'T')   
-                                    ], args=args)
-args["train"].strong_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
-                                           ColorJitter(0.3, 0.3, 0.3), 
-                                           ColorJitterLWIR(contrast=0.3),
-                                           ToTensor(),
-                                           Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
-                                           Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
-                                           RandomErasing(),  
-                                    ], args=args)
+                                        ], args=args)
+args["train"].strong_transform = ComposeForST([ RandomHorizontalFlipForST(p=0.5),
+                                                ColorJitter(0.3, 0.3, 0.3), 
+                                                ColorJitterLWIR(contrast=0.3),
+                                                ToTensor(),
+                                                Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
+                                                Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
+                                                RandomErasing(),  
+                                            ], args=args)
+
+args["train"].batch_weak_transform = ComposeForST([ RandomHorizontalFlipForST(p=0.5),
+                                                    ToTensor()
+                                                  ], args=args)
+args["train"].batch_norm_transform = ComposeForST([ Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
+                                                    Normalize(LWIR_MEAN, LWIR_STD, 'T')   
+                                                  ], args=args)
+args["train"].batch_strong_transform = ComposeForST([ ToPILImage(),
+                                                      ColorJitter(0.3, 0.3, 0.3), 
+                                                      ColorJitterLWIR(contrast=0.3),
+                                                      ToTensor(),
+                                                      Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
+                                                      Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
+                                                      RandomErasing(),  
+                                                    ], args=args)
 
 args["train"].weak4strong_transform = Compose([ RandomHorizontalFlip(p=0.5)
                                     ], args=args)

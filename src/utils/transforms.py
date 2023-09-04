@@ -33,7 +33,7 @@ else:
 
 
 __all__ = ["FusionDeadZone","FaultTolerant","TT_FaultTolerant","UnNormalize", "Compose", "ToTensor", "ToPILImage", "Normalize", "Resize", 
-           "Lambda", "RandomHorizontalFlip", "TT_RandomHorizontalFlip", "TT_FixedHorizontalFlip",  "RandomResizedCrop", "TT_RandomResizedCrop", "ColorJitter",
+           "Lambda", "RandomHorizontalFlip", "RandomHorizontalFlipForST", "TT_RandomHorizontalFlip", "TT_FixedHorizontalFlip",  "RandomResizedCrop", "TT_RandomResizedCrop", "ColorJitter",
            "ColorJitterLWIR", "Stretch"]
 
 _pil_interpolation_to_str = {
@@ -111,7 +111,7 @@ class ComposeForST(object):
 
         for t in self.transforms:    
             if self.args != None and t.__class__.__name__ in self.args.same_augmentation:
-                img, mask, vis_box, lwir_box, pair = t(img, mask, vis_box, lwir_box, self.prop)
+                img, mask, vis_box, lwir_box = t(img, mask, vis_box, lwir_box, self.prop)
 
             elif self.args != None and t.__class__.__name__ in self.args.want_augmentation:
                 #print(f"want 이번 실행은 : {t}")
@@ -704,6 +704,8 @@ class RandomCrop(object):
     def __repr__(self):
         return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
 
+from collections import deque
+randomHorizontalFlipPropQ = deque()
 class RandomHorizontalFlipForST(object):
     """Horizontally flip the given PIL Image randomly with a given probability.
     Args:
@@ -720,7 +722,9 @@ class RandomHorizontalFlipForST(object):
         Returns:
             PIL Image: Randomly flipped image.
         """
-        assert prop is not None, "prop must not None"
+        if prop is None:
+            prop = randomHorizontalFlipPropQ.popleft()
+        
         if prop < self.p:
             
             img = F.hflip(img)

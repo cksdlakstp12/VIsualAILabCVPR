@@ -266,9 +266,6 @@ class KAISTPedWS(KAISTPed):
                 self.annotations[img_id].append([float(x), float(y), float(w), float(h), float(score)])
     
     def load_propFile(self):
-        """
-        
-        """
         # Load flip probs
         self.props = dict()
         assert self.props_path is not None, "please call the set_propfile_path_by_epoch method before start epoch"
@@ -313,15 +310,16 @@ class KAISTPedWS(KAISTPed):
             id = f"{set_id}/{vid_id}/{img_id}"
             if id in self.teacher_image_ids.values() and self.aug_mode == "strong":
                 # Load bounding boxes from pre-inferred results
-                if self.soft_update_mode == "batch":
-                    boxes = self.annotations[id][0:4]
+                boxes = self.annotations[id][0:4]
 
-                    vis_boxes = np.array(boxes, dtype=np.float)
-                    lwir_boxes = np.array(boxes, dtype=np.float)
-                else:
-                    return vis, lwir, None, None, None, None, False
+                vis_boxes = np.array(boxes, dtype=np.float)
+                lwir_boxes = np.array(boxes, dtype=np.float)
 
                 is_annotation = False
+
+            elif self.soft_update_mode == "iter":
+                return vis, lwir, None, None, None, None, False
+            
             else:
                 for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id )) :
                     vis_boxes.append(line.strip().split(' '))

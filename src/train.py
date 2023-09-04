@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 from datasets import KAISTPed, KAISTPedWS
-from run_epoch import val_epoch, save_results, train_epoch
+from run_epoch import val_epoch, save_results, train_epoch, softTeaching_every_iter
 from model import MultiBoxLoss
 from train_utils import *
 from utils import utils
@@ -94,7 +94,14 @@ def main():
             soft_update(t_model, s_model, ema_scheduler.get_tau(epoch))
         
         elif train_conf.soft_update_mode == "iter":
-            pass
+            softTeaching_every_iter(s_model=s_model,
+                                    t_model=t_model,
+                                    dataloader=strong_aug_loader,
+                                    criterion=criterion,
+                                    optimizer=s_optimizer,
+                                    logger=logger,
+                                    **kwargs)
+            s_optim_scheduler.step()
         
         else:
             raise Exception("You should choise train mode between batch or iter")
