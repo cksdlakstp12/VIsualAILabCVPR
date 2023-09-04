@@ -22,7 +22,7 @@ soft_teacher.teacher_checkpoint = "../teacher_weights.pth.tar071"
 # train
 train = edict()
 
-train.soft_update_mode = "iter" # batch or iter
+train.soft_update_mode = "batch" # batch or iter
 
 train.day = "all"
 train.img_set = f"Labeled_Unlabled_combine.txt"
