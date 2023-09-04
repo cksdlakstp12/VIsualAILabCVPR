@@ -78,7 +78,7 @@ def main():
             t_infer_result = val_epoch(t_model, weak_aug_loader, 
                                         "KAISTPedWS",
                                         config.test.input_size, 
-                                        min_score=train_conf.min_score)
+                                        min_score=0.1)
             
             strong_aug_dataset.parse_teacher_inference(t_infer_result)
             strong_aug_dataset.load_propFile()

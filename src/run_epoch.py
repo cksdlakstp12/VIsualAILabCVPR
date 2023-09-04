@@ -78,7 +78,6 @@ def softTeaching_every_iter(s_model: SSD300,
 
         input_size = config.test.input_size
         height, width = input_size
-        min_score = 0.5
         xyxy_scaler_np = np.array([[width, height, width, height]], dtype=np.float32)
         results = dict()
         predicted_locs, predicted_scores = t_model(image_vis, image_lwir)
@@ -94,7 +93,7 @@ def softTeaching_every_iter(s_model: SSD300,
 
         # Detect objects in SSD output
         detections = t_model.module.detect_objects(predicted_locs_non, predicted_scores_non,
-                                                min_score=min_score, max_overlap=0.425, top_k=200)
+                                                min_score=0.1, max_overlap=0.425, top_k=200)
 
         det_boxes_batch, det_labels_batch, det_scores_batch = detections[:3]
 

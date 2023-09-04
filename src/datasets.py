@@ -234,6 +234,7 @@ class KAISTPedWS(KAISTPed):
         # self.weak4strong_transform = args[condition].weak4strong_transform 
         self.strong_transform = args[condition].strong_transform 
         self.annotations = defaultdict(list)
+        self.min_score = args[condition].min_score
         self.props_path_format = os.path.join(args.jobs_dir, 'props_%d.txt')
         self.props_path = None
 
@@ -263,7 +264,8 @@ class KAISTPedWS(KAISTPed):
         for image_id, detections in sorted(results.items(), key=lambda x: x[0]):
             for x, y, w, h, score in detections:
                 img_id = self.teacher_image_ids[image_id]
-                self.annotations[img_id].append([float(x), float(y), float(w), float(h), float(score)])
+                if score >= self.min_score:
+                    self.annotations[img_id].append([float(x), float(y), float(w), float(h), float(score)])
     
     def load_propFile(self):
         # Load flip probs
@@ -288,7 +290,7 @@ class KAISTPedWS(KAISTPed):
         frame_id = self.ids[index]
         set_id, vid_id, img_id = frame_id[-1]
 
-        if self.aug_mode == "weak":
+        if self.aug_mode == "weak" or self.soft_update_mode == "iter":
             flipProp = random.random()
             randomHorizontalFlipPropQ.append(flipProp)
             with open(self.props_path, "a") as f:
