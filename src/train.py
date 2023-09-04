@@ -73,7 +73,7 @@ def main():
     for epoch in range(start_epoch, epochs):
         # One epoch's training
         logger.info('#' * 20 + f' << Epoch {epoch:3d} >> ' + '#' * 20)
-        
+        s_train_loss = None
         if train_conf.soft_update_mode == "batch":
             weak_aug_dataset.set_propFilePath_by_epoch(epoch)
             strong_aug_dataset.set_propFilePath_by_epoch(epoch)
@@ -96,7 +96,7 @@ def main():
             soft_update(t_model, s_model, ema_scheduler.get_tau(epoch))
         
         elif train_conf.soft_update_mode == "iter":
-            softTeaching_every_iter(s_model=s_model,
+            s_train_loss = softTeaching_every_iter(s_model=s_model,
                                     t_model=t_model,
                                     dataloader=strong_aug_loader,
                                     criterion=criterion,
@@ -110,6 +110,7 @@ def main():
             raise Exception("You should choise train mode between batch or iter")
 
         # Save checkpoint
+        assert s_train_loss is not None, "s_train_loss should not be None"
         utils.save_checkpoint(epoch, s_model.module, s_optimizer, s_train_loss, jobs_dir)
         
         if epoch >= 0:
