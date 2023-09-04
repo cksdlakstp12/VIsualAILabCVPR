@@ -122,15 +122,18 @@ class EMAScheduler():
 
     @staticmethod
     def calc_tau(epoch, tau):
-        return 0
+        if epoch % 20 == 0:
+            return tau + 0.0001
     
     def get_tau(self, epoch):
         if not self.use_scheduler:
             return self.start_tau
         else:
             new_tau = EMAScheduler.calc_tau(epoch, self.last_tau)
-            if new_tau > self.max_tau: return self.max_tau
-            elif new_tau < self.min_tau: return self.min_tau
+            if new_tau > self.max_tau: 
+                return self.max_tau
+            elif new_tau < self.min_tau: 
+                return self.min_tau
             else:
                 self.last_tau = new_tau 
                 return new_tau

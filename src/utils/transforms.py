@@ -65,10 +65,58 @@ class Compose(object):
     def __call__(self, img, mask=None, vis_box=None, lwir_box=None, pair=1):
 
         for t in self.transforms:    
-
             if self.args != None and t.__class__.__name__ in self.args.want_augmentation:
                 #print(f"want 이번 실행은 : {t}")
                 img, mask, vis_box, lwir_box, pair = t(img, mask, vis_box, lwir_box, pair)
+
+            else:
+                #print(f"normal 이번 실행은 : {t}")
+                img, mask, vis_box, lwir_box = t(img, mask, vis_box, lwir_box)
+        
+        return img, mask, vis_box, lwir_box, pair
+
+    def __repr__(self):
+
+        format_string = self.__class__.__name__ + '('
+
+        for t in self.transforms:
+            format_string += '\n'
+            format_string += '    {0}'.format(t)
+        format_string += '\n)'
+        return format_string
+    
+class ComposeForST(object):
+    """Composes several transforms together.
+    Args:
+        transforms (list of ``Transform`` objects): list of transforms to compose.
+    Example:
+        >>> transforms.Compose([
+        >>>     transforms.CenterCrop(10),
+        >>>     transforms.ToTensor(),
+        >>> ])
+    """
+
+    def __init__(self, transforms, args=None):
+        self.transforms = transforms
+        self.args = args
+        self.prop = None
+
+    def add(self, transforms):
+        self.transforms += transforms
+
+    def update_prop(self, prop):
+        self.prop = prop
+
+    def __call__(self, img, mask=None, vis_box=None, lwir_box=None, pair=1):
+
+        for t in self.transforms:    
+            if self.args != None and t.__class__.__name__ in self.args.same_augmentation:
+                img, mask, vis_box, lwir_box, pair = t(img, mask, vis_box, lwir_box, self.prop)
+
+            elif self.args != None and t.__class__.__name__ in self.args.want_augmentation:
+                #print(f"want 이번 실행은 : {t}")
+                img, mask, vis_box, lwir_box, pair = t(img, mask, vis_box, lwir_box, pair)
+
             else:
                 #print(f"normal 이번 실행은 : {t}")
                 img, mask, vis_box, lwir_box = t(img, mask, vis_box, lwir_box)
@@ -656,7 +704,51 @@ class RandomCrop(object):
     def __repr__(self):
         return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
 
-randomHorizontalFlipProp = random.random()
+class RandomHorizontalFlipForST(object):
+    """Horizontally flip the given PIL Image randomly with a given probability.
+    Args:
+        p (float): probability of the image being flipped. Default value is 0.5
+    """
+
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, img, ann=None, box_vis=None, box_lwir=None, prop=None):
+        """
+        Args:
+            img (PIL Image): Image to be flipped.
+        Returns:
+            PIL Image: Randomly flipped image.
+        """
+        assert prop is not None, "prop must not None"
+        if prop < self.p:
+            
+            img = F.hflip(img)
+            ann = F.hflip(ann) if ann is not None else None
+
+            if box_vis is not None and box_lwir is not None:
+                #print("horizon 정상작동")
+                box_vis = F.box_flip(box_vis)
+                box_lwir = F.box_flip(box_lwir)       
+            #else:
+                #print("Dont flip")
+                #print("FLIPIPIPIPIP")
+                #print()
+                #print()
+                #print("vis",box_vis)
+                #print()
+                #print()
+                #print("lwir")
+                #print(box_lwir)
+                #print()
+                #print()
+                #print()
+            
+        return img, ann, box_vis, box_lwir
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+    
 class RandomHorizontalFlip(object):
     """Horizontally flip the given PIL Image randomly with a given probability.
     Args:
@@ -673,7 +765,7 @@ class RandomHorizontalFlip(object):
         Returns:
             PIL Image: Randomly flipped image.
         """
-        if randomHorizontalFlipProp < self.p:
+        if random.random() < self.p:
             
             img = F.hflip(img)
             ann = F.hflip(ann) if ann is not None else None

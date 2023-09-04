@@ -5,7 +5,7 @@ from easydict import EasyDict as edict
 import torch
 import numpy as np
 
-from utils.transforms import RandomErasing
+from utils.transforms import RandomErasing, ComposeForST
 from utils.transforms import *
 
 # Dataset path
@@ -21,6 +21,8 @@ soft_teacher.teacher_checkpoint = "../teacher_weights.pth.tar071"
 
 # train
 train = edict()
+
+train.soft_update_mode = "batch" # batch or iter
 
 train.day = "all"
 train.img_set = f"Labeled_Unlabled_combine.txt"
@@ -39,6 +41,8 @@ train.lr = 1e-4   # learning rate
 train.momentum = 0.9  # momentum
 train.weight_decay = 5e-4  # weight decay
 train.grad_clip = None  # clip if gradients are exploding, which may happen at larger batch sizes (sometimes at 32) - you will recognize it by a sorting error in the MuliBox loss calculation
+
+train.min_score = 0.5
 
 train.print_freq = 10   
 
@@ -126,6 +130,9 @@ args.upaired_augmentation = ["TT_RandomHorizontalFlip",
 args.want_augmentation = ["RandomHorizontalFlip",
                           "FixedHorizontalFlip",
                           "RandomResizedCrop"]
+
+args.same_augmentation = ["RandomHorizontalFlipForST"]
+
 ## Train dataset transform                             
 args["train"].img_transform = Compose([ ColorJitter(0.3, 0.3, 0.3), 
                                         ColorJitterLWIR(contrast=0.3)
@@ -155,22 +162,21 @@ args["test"].co_transform = Compose([Resize(test.input_size), \
                                     ])
 
 ## for soft teacher
-args.props_path = "./props.txt"
-args.cnvt_path = "./convert.txt"
-
-args["train"].weak_transform = Compose([ RandomHorizontalFlip(p=0.5),
+args["train"].weak_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
                                          ToTensor(),
                                          Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
                                          Normalize(LWIR_MEAN, LWIR_STD, 'T')   
                                     ], args=args)
-args["train"].weak4strong_transform = Compose([ RandomHorizontalFlip(p=0.5)
-                                    ], args=args)
-args["train"].strong_transform = Compose([ ColorJitter(0.3, 0.3, 0.3), 
+args["train"].strong_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
+                                           ColorJitter(0.3, 0.3, 0.3), 
                                            ColorJitterLWIR(contrast=0.3),
                                            ToTensor(),
                                            Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
                                            Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
                                            RandomErasing(),  
+                                    ], args=args)
+
+args["train"].weak4strong_transform = Compose([ RandomHorizontalFlip(p=0.5)
                                     ], args=args)
 
 ema = edict()

@@ -79,7 +79,7 @@ def main():
         t_infer_result = val_epoch(t_model, weak_aug_loader, 
                                    "KAISTPedWS",
                                    config.test.input_size, 
-                                   min_score=0.1)
+                                   min_score=train_conf.min_score)
         result_filename = os.path.join(jobs_dir, f'teacher_inferece_Epoch{epoch:3d}.txt')
         save_results(t_infer_result, result_filename)
         converter(train_conf.teacher_img_set, result_filename, args.cnvt_path)
@@ -117,7 +117,6 @@ def train_epoch(model: SSD300,
                 criterion: MultiBoxLoss,
                 optimizer: torch.optim.Optimizer,
                 logger: logging.Logger,
-                teachingValue: list,
                 **kwargs: Dict) -> float:
     """Train the model during an epoch
 
@@ -236,36 +235,36 @@ def train_epoch(model: SSD300,
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f}),\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\n'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\n'
-                        'sup_vis_loss {sup_vis_loss},\t'
-                        'sup_vis_cls_loss {sup_vis_cls_loss},\t'
-                        'sup_vis_loc_loss {sup_vis_loc_loss}\n'
-                        'sup_lwir_loss {sup_lwir_loss},\t'
-                        'sup_lwir_cls_loss {sup_lwir_cls_loss},\t'
-                        'sup_lwir_loc_loss {sup_lwir_loc_loss}\n'
-                        'un_vis_loss {un_vis_loss},\t'
-                        'un_vis_cls_loss {un_vis_cls_loss},\t'
-                        'un_vis_loc_loss {un_vis_loc_loss}\n'
-                        'un_lwir_loss {un_lwir_loss},\t'
-                        'un_lwir_cls_loss {un_lwir_cls_loss},\t'
-                        'un_lwir_loc_loss {un_lwir_loc_loss}\n'
-                        'is_anno {is_anno}\n'
+                        # 'sup_vis_loss {sup_vis_loss},\t'
+                        # 'sup_vis_cls_loss {sup_vis_cls_loss},\t'
+                        # 'sup_vis_loc_loss {sup_vis_loc_loss}\n'
+                        # 'sup_lwir_loss {sup_lwir_loss},\t'
+                        # 'sup_lwir_cls_loss {sup_lwir_cls_loss},\t'
+                        # 'sup_lwir_loc_loss {sup_lwir_loc_loss}\n'
+                        # 'un_vis_loss {un_vis_loss},\t'
+                        # 'un_vis_cls_loss {un_vis_cls_loss},\t'
+                        # 'un_vis_loc_loss {un_vis_loc_loss}\n'
+                        # 'un_lwir_loss {un_lwir_loss},\t'
+                        # 'un_lwir_cls_loss {un_lwir_cls_loss},\t'
+                        # 'un_lwir_loc_loss {un_lwir_loc_loss}\n'
+                        # 'is_anno {is_anno}\n'
                         'num of Positive {sup_vis_n_positives} {sup_lwir_n_positives} {un_vis_n_positives} {un_lwir_n_positives}\n\n'.format(batch_idx, len(dataloader),
                                                               batch_time=batch_time,
                                                               data_time=data_time,
                                                               loss=losses_sum,
-                                                              sup_vis_loss=sup_vis_loss,
-                                                              sup_vis_cls_loss=sup_vis_cls_loss,
-                                                              sup_vis_loc_loss=sup_vis_loc_loss,
-                                                              sup_lwir_loss=sup_lwir_loss,
-                                                              sup_lwir_cls_loss=sup_lwir_cls_loss,
-                                                              sup_lwir_loc_loss=sup_lwir_loc_loss,
-                                                              un_vis_loss=un_vis_loss,
-                                                              un_vis_cls_loss=un_vis_cls_loss,
-                                                              un_vis_loc_loss=un_vis_loc_loss,
-                                                              un_lwir_loss=un_lwir_loss,
-                                                              un_lwir_cls_loss=un_lwir_cls_loss,
-                                                              un_lwir_loc_loss=un_lwir_loc_loss,
-                                                              is_anno=is_anno,
+                                                            #   sup_vis_loss=sup_vis_loss,
+                                                            #   sup_vis_cls_loss=sup_vis_cls_loss,
+                                                            #   sup_vis_loc_loss=sup_vis_loc_loss,
+                                                            #   sup_lwir_loss=sup_lwir_loss,
+                                                            #   sup_lwir_cls_loss=sup_lwir_cls_loss,
+                                                            #   sup_lwir_loc_loss=sup_lwir_loc_loss,
+                                                            #   un_vis_loss=un_vis_loss,
+                                                            #   un_vis_cls_loss=un_vis_cls_loss,
+                                                            #   un_vis_loc_loss=un_vis_loc_loss,
+                                                            #   un_lwir_loss=un_lwir_loss,
+                                                            #   un_lwir_cls_loss=un_lwir_cls_loss,
+                                                            #   un_lwir_loc_loss=un_lwir_loc_loss,
+                                                            #   is_anno=is_anno,
                                                               sup_vis_n_positives=sup_vis_n_positives,
                                                               sup_lwir_n_positives=sup_lwir_n_positives,
                                                               un_vis_n_positives=un_vis_n_positives,

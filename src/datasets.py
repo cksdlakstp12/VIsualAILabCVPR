@@ -13,7 +13,7 @@ else:
 
 from utils.utils import *
 
-from utils.transforms import randomHorizontalFlipProp
+from utils.transforms import randomHorizontalFlipPropQ
 
 from collections import defaultdict
 
@@ -226,61 +226,81 @@ class KAISTPedWS(KAISTPed):
         super().__init__(args, condition)
         self.pair = 1
         self.aug_mode = aug_mode
-        if aug_mode == "weak":
-            self.image_set = args[condition].teacher_img_set
+        self.soft_update_mode = args[condition].soft_update_mode
+        self.teacher_image_set = args[condition].teacher_img_set
+        if aug_mode == "weak" and self.soft_update_mode == "batch":
+            self.image_set = self.teacher_image_set
         self.weak_transform = args[condition].weak_transform 
-        self.weak4strong_transform = args[condition].weak4strong_transform 
+        # self.weak4strong_transform = args[condition].weak4strong_transform 
         self.strong_transform = args[condition].strong_transform 
         self.annotations = defaultdict(list)
+        self.props_path_format = os.path.join(args.jobs_dir, 'props_', '%d.txt')
+        self.props_path = None
+
+        with open(self.teacher_image_set, 'r') as f:
+            self.teacher_image_ids = {idx+1: line.strip() for idx, line in enumerate(f)}
 
         self.ids = list()
         for line in open(os.path.join('./imageSets', self.image_set)):
             self.ids.append(('../data/kaist-rgbt/', line.strip().split('/')))
-            ##print(self.ids)
+            
         self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
         self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
 
-    def load_teacher_inference(self):
-        # Load annotations from file and store in a dictionary
+    def set_propFilePath_by_epoch(self, epoch):
+        self.props_path = self.props_path_format % epoch
+
+    def parse_teacher_inference(self, results):
+        """
+        This method for strong augmentation that using student model.
+        After teacher model inference non labeled data, 
+            parsing that result to be compatible with student model's input type
+        Parsing result save into self.annotations variable, 
+            it will called to determine the augmentation type(weak, strong).
+        This method should be used after teacher model inference.
+        """
         self.annotations = defaultdict(list)
-        with open(self.args.cnvt_path, "r") as f:
-            for line in f:
-                img_id, x, y, w, h, score = line.strip().split(",")
-                if float(score) >= 0.5:
-                    self.annotations[img_id].append([float(x), float(y), float(w), float(h), float(score)])
+        for image_id, detections in sorted(results.items(), key=lambda x: x[0]):
+            for x, y, w, h, score in detections:
+                img_id = self.teacher_image_set[image_id]
+                self.annotations[img_id].append([float(x), float(y), float(w), float(h), float(score)])
+    
+    def load_propFile(self):
+        """
         
+        """
         # Load flip probs
         self.props = dict()
-        with open(self.args.props_path, "r") as f:
+        assert self.props_path is not None, "please call the set_propfile_path_by_epoch method before start epoch"
+        with open(self.props_path, "r") as f:
             for line in f.readlines():
                 index, prop = line.strip().split(",")
                 self.props[index] = prop
-        os.remove(self.args.props_path)
+        os.remove(self.props_path)
 
     def __getitem__(self, index):
         vis, lwir, vis_box, lwir_box, vis_labels,lwir_labels, is_annotation = self.pull_item(index)
         ##print(self.ids[index])
         ##print(vis, lwir, boxes, labels, torch.ones(1,dtype=torch.int)*index, self.ids[index])
-        return vis, lwir, vis_box,lwir_box, vis_labels,lwir_labels, torch.ones(1,dtype=torch.int)*index, is_annotation
+        return vis, lwir, vis_box, lwir_box, vis_labels, lwir_labels, torch.ones(1,dtype=torch.int)*index, is_annotation
 
     def pull_item(self, index):
-        global randomHorizontalFlipProp
+        global randomHorizontalFlipPropQ
         is_annotation = True
 
         frame_id = self.ids[index]
-        ##print(frame_id)
         set_id, vid_id, img_id = frame_id[-1]
 
         if self.aug_mode == "weak":
-            randomHorizontalFlipProp = random.random()
-            with open(self.args.props_path, "a") as f:
-                f.write(f"{index},{randomHorizontalFlipProp}\n")
+            flipProp = random.random()
+            randomHorizontalFlipPropQ.append(flipProp)
+            with open(self.props_path, "a") as f:
+                f.write(f"{index},{flipProp}\n")
         else:
             if index in self.props:
-                randomHorizontalFlipProp = self.props[index]
+                randomHorizontalFlipPropQ.append(self.props[index])
             else:
-                # 기본 값 설정 또는 오류 메시지 출력
-                randomHorizontalFlipProp = random.random()
+                randomHorizontalFlipPropQ.append(random.random())
 
         vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id ))
         lwir = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id ) ).convert('L')
@@ -291,12 +311,15 @@ class KAISTPedWS(KAISTPed):
             vis_boxes = list()
             lwir_boxes = list()
             id = f"{set_id}/{vid_id}/{img_id}"
-            if id in self.annotations and self.aug_mode == "strong":
+            if id in self.teacher_image_ids.values() and self.aug_mode == "strong":
                 # Load bounding boxes from pre-inferred results
-                boxes = self.annotations[id][0:4]
+                if self.soft_update_mode == "batch":
+                    boxes = self.annotations[id][0:4]
 
-                vis_boxes = np.array(boxes, dtype=np.float)
-                lwir_boxes  = np.array(boxes, dtype=np.float)
+                    vis_boxes = np.array(boxes, dtype=np.float)
+                    lwir_boxes = np.array(boxes, dtype=np.float)
+                else:
+                    return vis, lwir, None, None, None, None, False
 
                 is_annotation = False
             else:
@@ -310,9 +333,13 @@ class KAISTPedWS(KAISTPed):
 
             boxes_vis = [[0, 0, 0, 0, -1]]
             boxes_lwir = [[0, 0, 0, 0, -1]]
-
+            
+            compatibilityIndex = 0
+            if is_annotation:
+                compatibilityIndex = 1
+                
             for i in range(len(vis_boxes)):
-                bndbox = [int(i) for i in vis_boxes[i][1:5]]
+                bndbox = [int(i) for i in vis_boxes[i][0+compatibilityIndex:4+compatibilityIndex]]
                 bndbox[2] = min( bndbox[2] + bndbox[0], width )
                 bndbox[3] = min( bndbox[3] + bndbox[1], height )
                 bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
@@ -322,7 +349,7 @@ class KAISTPedWS(KAISTPed):
             for i in range(len(lwir_boxes)) :
                 ##print(f"lwir : {lwir_boxes}\n")
                 name = lwir_boxes[i][0]
-                bndbox = [int(i) for i in lwir_boxes[i][1:5]]
+                bndbox = [int(i) for i in lwir_boxes[i][0+compatibilityIndex:4+compatibilityIndex]]
                 bndbox[2] = min( bndbox[2] + bndbox[0], width )
                 bndbox[3] = min( bndbox[3] + bndbox[1], height )
                 bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
@@ -345,7 +372,7 @@ class KAISTPedWS(KAISTPed):
         if self.aug_mode == "weak":
             vis, lwir, boxes_vis, boxes_lwir, _ = self.weak_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
         else:
-            vis, lwir, boxes_vis, boxes_lwir, _ = self.weak4strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
+            # vis, lwir, boxes_vis, boxes_lwir, _ = self.weak4strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
             vis, lwir, boxes_vis, boxes_lwir, _ = self.strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
 
         if self.co_transform is not None:

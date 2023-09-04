@@ -14,6 +14,6 @@ pip install Pillow==8.3.0
 
 cd src
 
-CUDA_VISIBLE_DEVICES=0 python train_eval.py
+CUDA_VISIBLE_DEVICES=0 python train.py
 
 exit 0
