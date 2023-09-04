@@ -252,14 +252,14 @@ class KAISTPedWS(KAISTPed):
             self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
             self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
 
-    #def load_teacher_inference(self,convert_name):
+    def load_teacher_inference(self,convert_name):
         # Load annotations from file and store in a dictionary
-    #    self.annotations = defaultdict(list)
-    #    with open(convert_name, "r") as f:
-    #        for line in f:
-    #            img_id, x, y, w, h, score = line.strip().split(",")
-    #            if float(score) >= 0.5:
-    #                self.annotations[img_id].append([float(x), float(y), float(w), float(h), float(score)])
+        self.annotations = defaultdict(list)
+        with open(convert_name, "r") as f:
+            for line in f:
+                img_id = line.strip()
+                #print("\n",line, img_id,"\n")
+                self.annotations[img_id].append([0,0,0,0])
         
         # Load flip probs
         #self.props = dict()
@@ -304,12 +304,13 @@ class KAISTPedWS(KAISTPed):
             vis_boxes = list()
             lwir_boxes = list()
             id = f"{set_id}/{vid_id}/{img_id}"
+            
             if id in self.annotations and self.aug_mode == "strong":
                 # Load bounding boxes from pre-inferred results
                 boxes = self.annotations[id][0:4]
                 vis_boxes = np.array(boxes, dtype=np.float)
                 lwir_boxes  = np.array(boxes, dtype=np.float)
-
+                #print(vis_boxes, lwir_boxes)
                 is_annotation = False
             else:
                 for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id )) :
@@ -499,7 +500,7 @@ class KAISTPedWS(KAISTPed):
         ##print(f"boxes_t : {boxes_t}")
 
         if is_annotation == False:
-            boxes_vis, boxes_lwir = None, None
+            boxes_vis, boxes_lwir, vis_labels, lwir_labels = None, None, None, None
 
         return vis, lwir, boxes_vis, boxes_lwir, vis_labels, lwir_labels, is_annotation
     
@@ -531,6 +532,8 @@ class KAISTPedWS(KAISTPed):
             index.append(b[6])
             is_anno.append(b[7])
 
+       # print(vis_labels, lwir_labels)
+        
         vis = torch.stack(vis, dim=0)
         lwir = torch.stack(lwir, dim=0)
   
