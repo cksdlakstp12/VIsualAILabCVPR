@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 
-from datasets import KAISTPed, KAISTPedWS
+from datasets import KAISTPed, KAISTPedWSBatch, KAISTPedWSIter
 from run_epoch import val_epoch, save_results, train_epoch, softTeaching_every_iter
 from model import MultiBoxLoss
 from train_utils import *
@@ -56,9 +56,11 @@ def main():
     criterion = MultiBoxLoss(priors_cxcy=s_model.module.priors_cxcy).to(device)
 
     # create dataloader
-    weak_aug_dataset, weak_aug_loader = create_dataloader(config, KAISTPedWS, aug_mode="weak", condition="train")
-    strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWS, aug_mode="strong", condition="train")
+    weak_aug_dataset, weak_aug_loader = create_dataloader(config, KAISTPedWSBatch, aug_mode="weak", condition="train")
+    strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWSBatch, aug_mode="strong", condition="train")
     test_dataset, test_loader = create_dataloader(config, KAISTPed, condition="test")
+    if train_conf.soft_update_mode == "iter":
+        strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWSIter, aug_mode="strong", condition="train")
 
     # EMA Scheduler
     ema_scheduler = EMAScheduler(config)
@@ -76,7 +78,7 @@ def main():
             weak_aug_dataset.set_propFilePath_by_epoch(epoch)
             strong_aug_dataset.set_propFilePath_by_epoch(epoch)
             t_infer_result = val_epoch(t_model, weak_aug_loader, 
-                                        "KAISTPedWS",
+                                        "KAISTPedWSBatch",
                                         config.test.input_size, 
                                         min_score=0.1)
             

@@ -206,7 +206,7 @@ class KAISTPed(data.Dataset):
   
         return vis, lwir, boxes, labels, index  
 
-class KAISTPedWS(KAISTPed):
+class KAISTPedWSBatch(KAISTPed):
     """KAIST Detection Dataset Object
     input is image, target is annotation
     Arguments:
@@ -228,7 +228,7 @@ class KAISTPedWS(KAISTPed):
         self.aug_mode = aug_mode
         self.soft_update_mode = args[condition].soft_update_mode
         self.teacher_image_set = args[condition].teacher_img_set
-        if aug_mode == "weak" and self.soft_update_mode == "batch":
+        if aug_mode == "weak":
             self.image_set = self.teacher_image_set
         self.weak_transform = args[condition].weak_transform 
         # self.weak4strong_transform = args[condition].weak4strong_transform 
@@ -290,7 +290,7 @@ class KAISTPedWS(KAISTPed):
         frame_id = self.ids[index]
         set_id, vid_id, img_id = frame_id[-1]
 
-        if self.aug_mode == "weak" or self.soft_update_mode == "iter":
+        if self.aug_mode == "weak":
             flipProp = random.random()
             randomHorizontalFlipPropQ.append(flipProp)
             with open(self.props_path, "a") as f:
@@ -319,9 +319,6 @@ class KAISTPedWS(KAISTPed):
 
                 is_annotation = False
 
-            elif self.soft_update_mode == "iter":
-                return vis, lwir, None, None, None, None, False
-            
             else:
                 for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id )) :
                     vis_boxes.append(line.strip().split(' '))
@@ -501,6 +498,262 @@ class KAISTPedWS(KAISTPed):
         lwir = torch.stack(lwir, dim=0)
   
         return vis, lwir, vis_box, lwir_box, vis_labels, lwir_labels, index, is_anno
+
+class KAISTPedWSIter(KAISTPedWSBatch):
+    """KAIST Detection Dataset Object
+    input is image, target is annotation
+    Arguments:
+        root (string): filepath to VOCdevkit folder.
+        image_set (string): imageset to use (eg. 'train', 'val', 'test')
+        transform (callable, optional): transformation to perform on the
+            input image
+        target_transform (callable, optional): transformation to perform on the
+            target `annotation`
+            (eg: take in caption string, return tensor of word indices)
+        dataset_name (string, optional): which dataset to load
+            (default: 'KAIST')
+        condition (string, optional): load condition
+            (default: 'Reasonabel')
+    """
+    def __init__(self, args, aug_mode, condition='train'):
+        super().__init__(args, aug_mode, condition)
+        self.strong_transform = args[condition].batch_strong_transform 
+
+    def pull_item(self, index):
+        is_annotation = True
+
+        frame_id = self.ids[index]
+        set_id, vid_id, img_id = frame_id[-1]
+
+        vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id ))
+        lwir = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id ) ).convert('L')
+    
+        width, height = lwir.size
+
+        if self.mode == 'train': 
+            vis_boxes = list()
+            lwir_boxes = list()
+            id = f"{set_id}/{vid_id}/{img_id}"
+            
+            if id in self.annotations and self.aug_mode == "strong":
+                # Load bounding boxes from pre-inferred results
+                boxes = self.annotations[id][0:4]
+                vis_boxes = np.array(boxes, dtype=np.float)
+                lwir_boxes  = np.array(boxes, dtype=np.float)
+                #print(vis_boxes, lwir_boxes)
+                is_annotation = False
+            else:
+                for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id )) :
+                    vis_boxes.append(line.strip().split(' '))
+                for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id)) :
+                    lwir_boxes.append(line.strip().split(' '))
+
+                #print(f"before vis : {vis_boxes}")
+                #print(f"before lwir : {lwir_boxes}")
+
+                vis_boxes = vis_boxes[1:]
+                lwir_boxes = lwir_boxes[1:]
+
+                #print(f"after vis : {vis_boxes}")
+                #print(f"after lwir : {lwir_boxes}")
+                
+            boxes_vis = [[0, 0, 0, 0, -1]]
+            boxes_lwir = [[0, 0, 0, 0, -1]]
+
+            compatibilityIndex = 0
+            if is_annotation:
+                compatibilityIndex = 1
+                
+            for i in range(len(vis_boxes)):
+                bndbox = [int(i) for i in vis_boxes[i][0+compatibilityIndex:4+compatibilityIndex]]
+                bndbox[2] = min( bndbox[2] + bndbox[0], width )
+                bndbox[3] = min( bndbox[3] + bndbox[1], height )
+                bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
+                bndbox.append(1)
+                boxes_vis += [bndbox]
+
+            for i in range(len(lwir_boxes)) :
+                ##print(f"lwir : {lwir_boxes}\n")
+                name = lwir_boxes[i][0]
+                bndbox = [int(i) for i in lwir_boxes[i][0+compatibilityIndex:4+compatibilityIndex]]
+                bndbox[2] = min( bndbox[2] + bndbox[0], width )
+                bndbox[3] = min( bndbox[3] + bndbox[1], height )
+                bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
+                bndbox.append(1)
+                boxes_lwir += [bndbox]
+
+
+            boxes_vis = np.array(boxes_vis, dtype=np.float)
+            boxes_lwir = np.array(boxes_lwir, dtype=np.float)
+
+            #print(f"boxes_vis : {boxes_vis}")
+            #print(f"boxes_lwir : {boxes_lwir}")
+
+        else :
+            boxes_vis = [[0, 0, 0, 0, -1]]
+            boxes_lwir = [[0, 0, 0, 0, -1]]
+            boxes_vis = np.array(boxes_vis, dtype=np.float)
+            boxes_lwir = np.array(boxes_lwir, dtype=np.float)
+
+        ## Apply transforms
+        if self.aug_mode == "weak":
+            vis, lwir, boxes_vis, boxes_lwir, _ = self.weak_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
+        else:
+            # vis, lwir, boxes_vis, boxes_lwir, _ = self.weak4strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
+            vis, lwir, boxes_vis, boxes_lwir, _ = self.strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
+
+        if self.co_transform is not None:
+
+            # vis, lwir, boxes_vis, boxes_lwir, pair = self.co_transform(vis, lwir, boxes_vis, boxes_lwir, pair)                      
+            if boxes_vis is None:
+                #print("vis none")
+                boxes = boxes_lwir
+            elif boxes_lwir is None:
+                #print("lwir none")
+                boxes = boxes_vis
+            else : 
+                ## Pair Condition
+                ## RGB / Thermal
+                ##  1  /  0  = 1
+                ##  0  /  1  = 2
+                ##  1  /  1  = 3
+                if self.pair == 1 :
+                    """
+                    if is_annotation == False:
+                        print("Before sup vis_box : ", boxes_vis)
+                        print("Befor sup lwir_box : ", boxes_lwir)
+                    else:
+                        print("Before un vis_box : ", boxes_vis)
+                        print("Befor un lwir_box : ", boxes_lwir)
+                    """
+                    if len(boxes_vis.shape) != 1 :
+                        boxes_vis[1:,4] = 3
+                    if len(boxes_lwir.shape) != 1 :
+                        boxes_lwir[1:,4] = 3
+                    #if is_annotation == True:
+                        #print("boxes_vis bef : ", boxes_vis)
+                        #print("boxes_lwir bef : ", boxes_lwir)
+                    #if is_annotation == False:
+                     #   print("after vis_box : ", boxes_vis)
+                     #   print("after lwir_box : ", boxes_lwir)
+                else :
+                    if len(boxes_vis.shape) != 1 :
+                        boxes_vis[1:,4] = 1
+                    if len(boxes_lwir.shape) != 1 :
+                        boxes_lwir[1:,4] = 2
+                    
+                #print("boxes_vis :", boxes_vis)
+                #print("boxes_lwir : ", boxes_lwir)
+                #boxes = torch.cat((boxes_vis,boxes_lwir), dim=0)
+                ##print("before : ",boxes)
+                #boxes = torch.tensor(list(map(list,set([tuple(bb) for bb in boxes.numpy()])))) 
+                ##print("after : ",boxes)
+
+        ## Set ignore flags
+        ignore_vis = torch.zeros(boxes_vis.size(0), dtype=torch.bool)
+        ignore_lwir = torch.zeros(boxes_lwir.size(0), dtype=torch.bool)
+        
+        for ii, box in enumerate(boxes_vis):
+            ##print("boxes :",boxes)
+            #print("vis_box : ", box)
+                        
+            x = box[0] * width
+            y = box[1] * height
+            w = ( box[2] - box[0] ) * width
+            h = ( box[3] - box[1] ) * height
+
+            if  x < self.cond['xRng'][0] or \
+                y < self.cond['xRng'][0] or \
+                x+w > self.cond['xRng'][1] or \
+                y+h > self.cond['xRng'][1] or \
+                w < self.cond['wRng'][0] or \
+                w > self.cond['wRng'][1] or \
+                h < self.cond['hRng'][0] or \
+                h > self.cond['hRng'][1]:
+
+                ignore_vis[ii] = 1
+
+        for ii, box in enumerate(boxes_lwir):
+            ##print("boxes :",boxes)
+            #print("lwir_box : ", box)
+                        
+            x = box[0] * width
+            y = box[1] * height
+            w = ( box[2] - box[0] ) * width
+            h = ( box[3] - box[1] ) * height
+
+            if  x < self.cond['xRng'][0] or \
+                y < self.cond['xRng'][0] or \
+                x+w > self.cond['xRng'][1] or \
+                y+h > self.cond['xRng'][1] or \
+                w < self.cond['wRng'][0] or \
+                w > self.cond['wRng'][1] or \
+                h < self.cond['hRng'][0] or \
+                h > self.cond['hRng'][1]:
+
+                ignore_lwir[ii] = 1
+        
+        boxes_vis[ignore_vis, 4] = -1
+        boxes_lwir[ignore_lwir, 4] = -1
+        """
+        if is_annotation == False:
+            print("sup boxes_vis aft : ", boxes_vis)
+            print("sup boxes_lwir aft : ", boxes_lwir)
+        else:
+            print("un boxes_vis aft : ", boxes_vis)
+            print("un boxes_lwir aft : ", boxes_lwir)
+        """
+        ##print(f"여기 박스 : {boxes}")
+        vis_labels = boxes_vis[:,4]
+        lwir_labels = boxes_lwir[:,4]
+        ##print(f"여기 레이블 : {labels}")
+        boxes_vis = boxes_vis[:,0:4]
+        boxes_lwir = boxes_lwir[:,0:4]
+        #if is_annotation == False:
+        #print("isanno / vis_labels : ", is_annotation ,vis_labels)
+        #print("isanno / lwir_labels : ", is_annotation, lwir_labels)
+        ##print(f"boxes_t : {boxes_t}")
+
+        if is_annotation == False:
+            boxes_vis, boxes_lwir, vis_labels, lwir_labels = None, None, None, None
+
+        return vis, lwir, boxes_vis, boxes_lwir, vis_labels, lwir_labels, is_annotation
+    
+    def collate_fn(self, batch):
+        """
+        Since each image may have a different number of objects, we need a collate function (to be passed to the DataLoader).
+        This describes how to combine these tensors of different sizes. We use lists.
+        Note: this need not be defined in this Class, can be standalone.
+        :param batch: an iterable of N sets from __getitem__()
+        :return: a tensor of images, lists of varying-size tensors of bounding boxes, labels, and difficulties
+        """
+
+        vis = list()
+        lwir = list()
+        vis_box = list()
+        lwir_box = list()
+        vis_labels = list()
+        lwir_labels = list()
+        index = list()
+        is_anno = list()
+
+        for b in batch:
+            vis.append(b[0])
+            lwir.append(b[1])
+            vis_box.append(b[2])
+            lwir_box.append(b[3])
+            vis_labels.append(b[4])
+            lwir_labels.append(b[5])
+            index.append(b[6])
+            is_anno.append(b[7])
+
+       # print(vis_labels, lwir_labels)
+        
+        vis = torch.stack(vis, dim=0)
+        lwir = torch.stack(lwir, dim=0)
+  
+        return vis, lwir, vis_box, lwir_box, vis_labels, lwir_labels, index, is_anno
+
 
 class LoadBox(object):
     """Transforms a VOC annotation into a Tensor of bbox coords and label index

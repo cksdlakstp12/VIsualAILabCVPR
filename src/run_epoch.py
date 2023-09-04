@@ -17,7 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from model import SSD300, MultiBoxLoss
-from datasets import KAISTPed, KAISTPedWS
+from datasets import KAISTPed
 from train_utils import *
 from utils import utils
 from utils.transforms import FusionDeadZone
@@ -511,7 +511,7 @@ def val_epoch(model: SSD300, dataloader: DataLoader, dataset_type: str, input_si
     results = dict()
     with torch.no_grad():
         for i, blob in enumerate(tqdm(dataloader, desc='Evaluating')):
-            if dataset_type == "KAISTPedWS":
+            if dataset_type == "KAISTPedWSBatch":
                 image_vis, image_lwir, vis_boxes, lwir_boxes, vis_labels, lwir_labels, indices, _ = blob
             else:
                 image_vis, image_lwir, boxes, labels, indices = blob
