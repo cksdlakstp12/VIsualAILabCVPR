@@ -32,6 +32,16 @@ def main():
     start_epoch = train_conf.start_epoch
     epochs = train_conf.epochs
     phase = "Multispectral"
+    
+    # Set job directory
+    if args.exp_time is None:
+        args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm')
+    
+    # TODO(sohwang): should config.exp_name be updated from command line argument?
+    exp_name = ('_' + args.exp_name) if args.exp_name else '_'
+    jobs_dir = os.path.join('jobs', args.exp_time + exp_name)
+    os.makedirs(jobs_dir, exist_ok=True)
+    args.jobs_dir = jobs_dir
 
     # Initialize student model and load teacher checkpoint
     s_model, s_optimizer, s_optim_scheduler, \
@@ -52,16 +62,6 @@ def main():
 
     # EMA Scheduler
     ema_scheduler = EMAScheduler(config)
-
-    # Set job directory
-    if args.exp_time is None:
-        args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm')
-    
-    # TODO(sohwang): should config.exp_name be updated from command line argument?
-    exp_name = ('_' + args.exp_name) if args.exp_name else '_'
-    jobs_dir = os.path.join('jobs', args.exp_time + exp_name)
-    os.makedirs(jobs_dir, exist_ok=True)
-    args.jobs_dir = jobs_dir
 
     # Make logger
     logger = utils.make_logger(args)
