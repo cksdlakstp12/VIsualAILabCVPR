@@ -234,7 +234,7 @@ class KAISTPedWS(KAISTPed):
         # self.weak4strong_transform = args[condition].weak4strong_transform 
         self.strong_transform = args[condition].strong_transform 
         self.annotations = defaultdict(list)
-        self.props_path_format = os.path.join(args.jobs_dir, 'props_', '%d.txt')
+        self.props_path_format = os.path.join(args.jobs_dir, 'props_%d.txt')
         self.props_path = None
 
         with open(os.path.join('./imageSets', self.teacher_image_set), 'r') as f:
