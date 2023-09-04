@@ -102,6 +102,7 @@ def main():
                                     criterion=criterion,
                                     optimizer=s_optimizer,
                                     logger=logger,
+                                    tau=ema_scheduler.get_tau(epoch),
                                     **kwargs)
             s_optim_scheduler.step()
         

@@ -30,6 +30,7 @@ def softTeaching_every_iter(s_model: SSD300,
                             criterion: MultiBoxLoss,
                             optimizer: torch.optim.Optimizer,
                             logger: logging.Logger,
+                            tau: float,
                             **kwargs: Dict) -> float:
     """Train the student model during an epoch
 
@@ -280,7 +281,7 @@ def softTeaching_every_iter(s_model: SSD300,
 
         start = time.time()
 
-        soft_update(t_model, s_model, config.args.tau)
+        soft_update(t_model, s_model, tau)
 
         # Print status
         if batch_idx % kwargs.get('print_freq', 10) == 0:
