@@ -237,7 +237,7 @@ class KAISTPedWS(KAISTPed):
         self.props_path_format = os.path.join(args.jobs_dir, 'props_', '%d.txt')
         self.props_path = None
 
-        with open(self.teacher_image_set, 'r') as f:
+        with open(os.path.join('./imageSets', self.teacher_image_set), 'r') as f:
             self.teacher_image_ids = {idx+1: line.strip() for idx, line in enumerate(f)}
 
         self.ids = list()
