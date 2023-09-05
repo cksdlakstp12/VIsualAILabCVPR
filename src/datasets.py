@@ -517,6 +517,8 @@ class KAISTPedWSIter(KAISTPedWSEpoch):
     """
     def __init__(self, args, aug_mode, condition='train'):
         super().__init__(args, aug_mode, condition)
+        self.weak_transform = args[condition].iter_weak_transform 
+        self.strong_transform = args[condition].iter_strong_transform 
 
     def pull_item(self, index):
         is_annotation = True
