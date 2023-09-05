@@ -113,7 +113,7 @@ def main():
         assert s_train_loss is not None, "s_train_loss should not be None"
         utils.save_checkpoint(epoch, s_model.module, s_optimizer, s_train_loss, jobs_dir)
         
-        if epoch >= 0:
+        if epoch >= 5:
             result_filename = os.path.join(jobs_dir, f'Epoch{epoch:03d}_test_det.txt')
 
             # High min_score setting is important to guarantee reasonable number of detections
