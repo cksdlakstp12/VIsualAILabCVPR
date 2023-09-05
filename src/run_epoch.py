@@ -183,25 +183,7 @@ def softTeaching_every_iter(s_model: SSD300,
             lwir_box[j] = boxes_lwir
             vis_labels[j] = label_vis
             lwir_labels[j] = label_lwir
-
-            #print(f"j : {j}, vis_labels[i] : {vis_labels[j]}")
-
-#                if vis_labels[i] == None:
- #                   vis_labels[i] = torch.FloatTensor([-1]).to(device)
-        
-
-        #print(f"\n\nvis_box : {vis_box}\n\n")
-        #print(f"\n\nlwir_box : {lwir_box}\n\n")
-        """
-        for num, i in enumerate(anno_index):
-            for f in results[num]:
-                for line in f:
-                    x, y, w, h, score = line.strip().split(",")
-                    if float(score) >= 0.5:
-                        vis_box[i].append([float(x), float(y), float(w), float(h)])
-                        lwir_box[i].append([float(x), float(y), float(w), float(h)])
-        """
-
+            
         # Forward prop.
         predicted_locs, predicted_scores = s_model(image_vis, image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
 
@@ -255,17 +237,12 @@ def softTeaching_every_iter(s_model: SSD300,
             un_vis_loss, un_vis_cls_loss, un_vis_loc_loss, un_vis_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_vis_box, un_vis_labels)
             un_lwir_loss, un_lwir_cls_loss, un_lwir_loc_loss, un_lwir_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_lwir_box, un_lwir_labels)
             un_loss = un_vis_loss + un_lwir_loss
-            #+ F.mse_loss(un_vis_cls_loss.float(), un_lwir_cls_loss.float()) + F.mse_loss(un_vis_loc_loss.float(), un_lwir_loc_loss.float())
-
+            
         loss = sup_loss + un_loss
 
         # Backward prop.
         optimizer.zero_grad()
         loss.backward()
-
-        # TODO(sohwang): Do we need this?
-        #if np.isnan(loss.item()):
-            #loss, cls_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
 
         # Clip gradients, if necessary
         if kwargs.get('grad_clip', None):
@@ -275,8 +252,6 @@ def softTeaching_every_iter(s_model: SSD300,
         optimizer.step()
 
         losses_sum.update(loss.item())
-        # losses_loc.update(loc_loss.sum().item())
-        # losses_cls.update(cls_loss.sum().item())
         batch_time.update(time.time() - start)
 
         start = time.time()

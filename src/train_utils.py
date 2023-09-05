@@ -124,6 +124,7 @@ class EMAScheduler():
     def calc_tau(epoch, tau):
         if epoch % 20 == 0:
             return tau + 0.0001
+        return tau
     
     def get_tau(self, epoch):
         if not self.use_scheduler:

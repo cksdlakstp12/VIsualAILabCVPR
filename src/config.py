@@ -176,14 +176,6 @@ args["train"].strong_transform = ComposeForST([ RandomHorizontalFlipForST(p=0.5)
                                                 RandomErasing(),  
                                             ], args=args)
 
-args["train"].epoch_strong_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
-                                                ColorJitter(0.3, 0.3, 0.3), 
-                                                ColorJitterLWIR(contrast=0.3),
-                                                ToTensor(),
-                                                Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
-                                                Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
-                                                RandomErasing(),  
-                                            ], args=args)
 ema = edict()
 ema.use_scheduler = True
 ema.tau = 0.0001 # it also be start_tau when using scheduler
