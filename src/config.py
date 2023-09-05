@@ -176,7 +176,7 @@ args["train"].strong_transform = ComposeForST([ RandomHorizontalFlipForST(p=0.5)
                                                 RandomErasing(),  
                                             ], args=args)
 
-args["train"].batch_strong_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
+args["train"].epoch_strong_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
                                                 ColorJitter(0.3, 0.3, 0.3), 
                                                 ColorJitterLWIR(contrast=0.3),
                                                 ToTensor(),
