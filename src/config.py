@@ -22,7 +22,7 @@ soft_teacher.teacher_checkpoint = "../teacher_weights.pth.tar071"
 # train
 train = edict()
 
-train.soft_update_mode = "batch" # batch or iter
+train.soft_update_mode = "epoch" # epoch or iter
 
 train.day = "all"
 train.img_set = f"Labeled_Unlabled_combine.txt"
@@ -188,5 +188,5 @@ ema = edict()
 ema.use_scheduler = True
 ema.tau = 0.0001 # it also be start_tau when using scheduler
 ema.scheduling_start_epoch = 0
-ema.max_tau = 0.1
+ema.max_tau = 0.001
 ema.min_tau = 0.0001

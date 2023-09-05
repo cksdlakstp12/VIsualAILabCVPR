@@ -206,7 +206,7 @@ class KAISTPed(data.Dataset):
   
         return vis, lwir, boxes, labels, index  
 
-class KAISTPedWSBatch(KAISTPed):
+class KAISTPedWSEpoch(KAISTPed):
     """KAIST Detection Dataset Object
     input is image, target is annotation
     Arguments:
@@ -499,7 +499,7 @@ class KAISTPedWSBatch(KAISTPed):
   
         return vis, lwir, vis_box, lwir_box, vis_labels, lwir_labels, index, is_anno
 
-class KAISTPedWSIter(KAISTPedWSBatch):
+class KAISTPedWSIter(KAISTPedWSEpoch):
     """KAIST Detection Dataset Object
     input is image, target is annotation
     Arguments:
@@ -517,7 +517,7 @@ class KAISTPedWSIter(KAISTPedWSBatch):
     """
     def __init__(self, args, aug_mode, condition='train'):
         super().__init__(args, aug_mode, condition)
-        self.strong_transform = args[condition].batch_strong_transform 
+        self.strong_transform = args[condition].epoch_strong_transform 
 
     def pull_item(self, index):
         is_annotation = True

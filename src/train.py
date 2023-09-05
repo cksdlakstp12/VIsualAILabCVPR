@@ -74,11 +74,11 @@ def main():
         # One epoch's training
         logger.info('#' * 20 + f' << Epoch {epoch:3d} >> ' + '#' * 20)
         s_train_loss = None
-        if train_conf.soft_update_mode == "batch":
+        if train_conf.soft_update_mode == "epoch":
             weak_aug_dataset.set_propFilePath_by_epoch(epoch)
             strong_aug_dataset.set_propFilePath_by_epoch(epoch)
             t_infer_result = val_epoch(t_model, weak_aug_loader, 
-                                        "KAISTPedWSBatch",
+                                        "KAISTPedWSEpoch",
                                         config.test.input_size, 
                                         min_score=0.1)
             
