@@ -117,11 +117,12 @@ class EMAScheduler():
         self.start_tau = config.ema.tau
         self.scheduling_start_epoch = config.ema.scheduling_start_epoch
         self.max_tau = config.ema.max_tau
-        self.min_tau = config.ema.min_tau
         self.last_tau = config.ema.tau
 
     @staticmethod
     def calc_tau(epoch, tau):
+        if epoch < 5:
+            return 0
         if epoch % 20 == 0:
             return tau + 0.0001
         return tau
@@ -133,8 +134,6 @@ class EMAScheduler():
             new_tau = EMAScheduler.calc_tau(epoch, self.last_tau)
             if new_tau > self.max_tau: 
                 return self.max_tau
-            elif new_tau < self.min_tau: 
-                return self.min_tau
             else:
                 self.last_tau = new_tau 
                 return new_tau

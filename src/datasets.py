@@ -11,8 +11,12 @@ if sys.version_info[0] == 2:
 else:
     import xml.etree.ElementTree as ET
 
-from utils.utils import *
+try:
+    from . import functional as F
+except:
+    import functional as F
 
+from utils.utils import *
 from utils.transforms import randomHorizontalFlipPropQ
 
 from collections import defaultdict
@@ -515,11 +519,17 @@ class KAISTPedWSIter(KAISTPedWSEpoch):
         condition (string, optional): load condition
             (default: 'Reasonabel')
     """
-    def __init__(self, args, aug_mode, condition='train'):
-        super().__init__(args, aug_mode, condition)
+    def __init__(self, args, condition='train'):
+        super().__init__(args, "strong", condition)
         self.weak_transform = args[condition].iter_weak_transform 
         self.strong_transform = args[condition].iter_strong_transform 
-
+        self.baseline_transform = args[condition].baseline_transform 
+    def __getitem__(self, index):
+        w_vis, w_lwir, s_vis, s_lwir, vis_box, lwir_box, vis_labels,lwir_labels, is_annotation = self.pull_item(index)
+        ##print(self.ids[index])
+        ##print(vis, lwir, boxes, labels, torch.ones(1,dtype=torch.int)*index, self.ids[index])
+        return w_vis, w_lwir, s_vis, s_lwir, vis_box, lwir_box, vis_labels, lwir_labels, torch.ones(1,dtype=torch.int)*index, is_annotation
+    
     def pull_item(self, index):
         is_annotation = True
 
@@ -536,12 +546,16 @@ class KAISTPedWSIter(KAISTPedWSEpoch):
             lwir_boxes = list()
             id = f"{set_id}/{vid_id}/{img_id}"
             
-            if id in self.teacher_image_ids.values() and self.aug_mode == "strong":
+            if id in self.teacher_image_ids.values():
                 # Load bounding boxes from pre-inferred results
                 is_annotation = False
-                vis, lwir, _, _, _ = self.weak_transform(vis, lwir, None, None, self.pair)
+                prop = random.random()
+                self.weak_transform.update_prop(prop)
+                self.strong_transform.update_prop(prop)
+                w_vis, w_lwir, _, _, _ = self.weak_transform(vis, lwir, None, None, self.pair)
+                s_vis, s_lwir, _, _, _ = self.strong_transform(vis, lwir, None, None, self.pair)
                 #print(vis_boxes, lwir_boxes)
-                return vis, lwir, None, None, None, None, is_annotation
+                return w_vis, w_lwir, s_vis, s_lwir, None, None, None, None, is_annotation
             else:
                 for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id )) :
                     vis_boxes.append(line.strip().split(' '))
@@ -595,9 +609,7 @@ class KAISTPedWSIter(KAISTPedWSEpoch):
             boxes_lwir = np.array(boxes_lwir, dtype=np.float)
 
         ## Apply transforms
-        # vis, lwir, boxes_vis, boxes_lwir, _ = self.weak4strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
-        vis, lwir, boxes_vis, boxes_lwir, _ = self.strong_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
-
+        vis, lwir, boxes_vis, boxes_lwir, _ = self.baseline_transform(vis, lwir, boxes_vis, boxes_lwir, self.pair)
         if self.co_transform is not None:
 
             # vis, lwir, boxes_vis, boxes_lwir, pair = self.co_transform(vis, lwir, boxes_vis, boxes_lwir, pair)                      
@@ -710,11 +722,46 @@ class KAISTPedWSIter(KAISTPedWSEpoch):
         #print("isanno / lwir_labels : ", is_annotation, lwir_labels)
         ##print(f"boxes_t : {boxes_t}")
 
-        if is_annotation == False:
-            boxes_vis, boxes_lwir, vis_labels, lwir_labels = None, None, None, None
+        return vis, lwir, vis, lwir, boxes_vis, boxes_lwir, vis_labels, lwir_labels, is_annotation
+    
+    def collate_fn(self, batch):
+        """
+        Since each image may have a different number of objects, we need a collate function (to be passed to the DataLoader).
+        This describes how to combine these tensors of different sizes. We use lists.
+        Note: this need not be defined in this Class, can be standalone.
+        :param batch: an iterable of N sets from __getitem__()
+        :return: a tensor of images, lists of varying-size tensors of bounding boxes, labels, and difficulties
+        """
 
-        return vis, lwir, boxes_vis, boxes_lwir, vis_labels, lwir_labels, is_annotation
+        w_vis = list()
+        w_lwir = list()
+        s_vis = list()
+        s_lwir = list()
+        vis_box = list()
+        lwir_box = list()
+        vis_labels = list()
+        lwir_labels = list()
+        index = list()
+        is_anno = list()
 
+        for b in batch:
+            w_vis.append(b[0])
+            w_lwir.append(b[1])
+            s_vis.append(b[2])
+            s_lwir.append(b[3])
+            vis_box.append(b[4])
+            lwir_box.append(b[5])
+            vis_labels.append(b[6])
+            lwir_labels.append(b[7])
+            index.append(b[8])
+            is_anno.append(b[9])
+
+        w_vis = torch.stack(w_vis, dim=0)
+        w_lwir = torch.stack(w_lwir, dim=0)
+        s_vis = torch.stack(s_vis, dim=0)
+        s_lwir = torch.stack(s_lwir, dim=0)
+  
+        return w_vis, w_lwir, s_vis, s_lwir, vis_box, lwir_box, vis_labels, lwir_labels, index, is_anno
 class LoadBox(object):
     """Transforms a VOC annotation into a Tensor of bbox coords and label index
     Initilized with a dictionary lookup of classnames to indexes

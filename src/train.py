@@ -35,7 +35,7 @@ def main():
     
     # Set job directory
     if args.exp_time is None:
-        args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm')
+        args.exp_time = datetime.now().strftime('%Y-%m-%d_%Hh%Mm%Ss')
     
     # TODO(sohwang): should config.exp_name be updated from command line argument?
     exp_name = ('_' + args.exp_name) if args.exp_name else '_'
@@ -60,7 +60,7 @@ def main():
     strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWSEpoch, aug_mode="strong", condition="train")
     test_dataset, test_loader = create_dataloader(config, KAISTPed, condition="test")
     if train_conf.soft_update_mode == "iter":
-        strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWSIter, aug_mode="strong", condition="train")
+        strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWSIter, condition="train")
 
     # EMA Scheduler
     ema_scheduler = EMAScheduler(config)
@@ -102,6 +102,7 @@ def main():
                                     criterion=criterion,
                                     optimizer=s_optimizer,
                                     logger=logger,
+                                    epoch=epoch,
                                     tau=ema_scheduler.get_tau(epoch),
                                     **kwargs)
             s_optim_scheduler.step()

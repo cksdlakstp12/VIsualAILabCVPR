@@ -30,6 +30,7 @@ def softTeaching_every_iter(s_model: SSD300,
                             criterion: MultiBoxLoss,
                             optimizer: torch.optim.Optimizer,
                             logger: logging.Logger,
+                            epoch: int,
                             tau: float,
                             **kwargs: Dict) -> float:
     """Train the student model during an epoch
@@ -67,21 +68,23 @@ def softTeaching_every_iter(s_model: SSD300,
     start = time.time()
 
     # Batches
-    for batch_idx, (image_vis, image_lwir, vis_box, lwir_box, vis_labels, lwir_labels, _, is_anno) in enumerate(dataloader):
+    for batch_idx, (w_image_vis, w_image_lwir, s_image_vis, s_image_lwir, vis_box, lwir_box, vis_labels, lwir_labels, _, is_anno) in enumerate(dataloader):
         data_time.update(time.time() - start)
 
         #print(f"\nanno : {is_anno}\n")
         #t_model.eval()
 
         # Move to default device
-        image_vis = image_vis.to(device)
-        image_lwir = image_lwir.to(device)
+        w_image_vis = w_image_vis.to(device)
+        w_image_lwir = w_image_lwir.to(device)
+        s_image_vis = s_image_vis.to(device)
+        s_image_lwir = s_image_lwir.to(device)
 
         input_size = config.test.input_size
         height, width = input_size
         xyxy_scaler_np = np.array([[width, height, width, height]], dtype=np.float32)
         results = dict()
-        predicted_locs, predicted_scores = t_model(image_vis, image_lwir)
+        predicted_locs, predicted_scores = t_model(w_image_vis, w_image_lwir)
 
         anno_index = list()
         for index, anno in enumerate(is_anno):
@@ -185,7 +188,10 @@ def softTeaching_every_iter(s_model: SSD300,
             lwir_labels[j] = label_lwir
             
         # Forward prop.
-        predicted_locs, predicted_scores = s_model(image_vis, image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
+        if epoch < 10:
+            predicted_locs, predicted_scores = s_model(w_image_vis, w_image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
+        else:
+            predicted_locs, predicted_scores = s_model(s_image_vis, s_image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
 
         sup_vis_box = list()
         sup_lwir_box = list()
@@ -254,9 +260,10 @@ def softTeaching_every_iter(s_model: SSD300,
         losses_sum.update(loss.item())
         batch_time.update(time.time() - start)
 
-        start = time.time()
+        if epoch >= 20:
+            soft_update(t_model, s_model, tau)
 
-        soft_update(t_model, s_model, tau)
+        start = time.time()
 
         # Print status
         if batch_idx % kwargs.get('print_freq', 10) == 0:

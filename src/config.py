@@ -25,7 +25,7 @@ train = edict()
 train.soft_update_mode = "iter" # epoch or iter
 
 train.day = "all"
-train.img_set = f"Labeled_Unlabled_combine.txt"
+train.img_set = f"Labeled_Unlabled_combine2.txt"
 train.teacher_img_set = "Unlabeled_90.txt"
 
 train.checkpoint = None ## Load chekpoint
@@ -175,6 +175,7 @@ args["train"].strong_transform = ComposeForST([ RandomHorizontalFlipForST(p=0.5)
                                                 Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
                                                 RandomErasing(),  
                                             ], args=args)
+
 args["train"].iter_weak_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
                                          ToTensor(),
                                          Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
@@ -188,10 +189,16 @@ args["train"].iter_strong_transform = ComposeForST([ RandomHorizontalFlip(p=0.5)
                                                 Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
                                                 RandomErasing(),  
                                             ], args=args)
+args["train"].baseline_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
+                                                ColorJitter(0.3, 0.3, 0.3), 
+                                                ColorJitterLWIR(contrast=0.3),
+                                                ToTensor(),
+                                                Normalize(IMAGE_MEAN, IMAGE_STD, 'R'), 
+                                                Normalize(LWIR_MEAN, LWIR_STD, 'T'), 
+                                            ], args=args)
 
 ema = edict()
 ema.use_scheduler = True
 ema.tau = 0.0001 # it also be start_tau when using scheduler
 ema.scheduling_start_epoch = 0
 ema.max_tau = 0.001
-ema.min_tau = 0.0001
