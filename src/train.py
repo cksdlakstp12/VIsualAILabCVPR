@@ -6,8 +6,8 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 
-from datasets import KAISTPed, KAISTPedWSEpoch, KAISTPedWSIter
-from run_epoch import val_epoch, save_results, train_epoch, softTeaching_every_iter
+from datasets_2 import KAISTPed, KAISTPedWSEpoch, KAISTPedWSIter
+from run_epoch2 import val_epoch, save_results, train_epoch, softTeaching_every_iter
 from model import MultiBoxLoss
 from train_utils import *
 from utils import utils
@@ -32,6 +32,8 @@ def main():
     start_epoch = train_conf.start_epoch
     epochs = train_conf.epochs
     phase = "Multispectral"
+
+
     
     # Set job directory
     if args.exp_time is None:
@@ -44,8 +46,18 @@ def main():
     args.jobs_dir = jobs_dir
 
     # Initialize student model and load teacher checkpoint
+
     s_model, s_optimizer, s_optim_scheduler, \
     t_model, t_optimizer, t_optim_scheduler = load_SoftTeacher(config)
+    
+    if checkpoint is not None:
+        checkpoint = torch.load(checkpoint)
+        start_epoch = checkpoint['epoch'] + 1
+        s_train_loss = checkpoint['loss']
+        print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' % (start_epoch, s_train_loss))
+        s_model = checkpoint['model']
+        s_optimizer = checkpoint['optimizer']
+        s_optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(s_optimizer, milestones=[int(train_conf.epochs * 0.5)], gamma=0.1)
 
     # Move to default device
     s_model = s_model.to(device)
@@ -60,7 +72,7 @@ def main():
     strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWSEpoch, aug_mode="strong", condition="train")
     test_dataset, test_loader = create_dataloader(config, KAISTPed, condition="test")
     if train_conf.soft_update_mode == "iter":
-        strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWSIter, condition="train")
+        strong_aug_dataset, L_aug_loader, U_aug_loader = create_dataloader(config, KAISTPedWSIter, sample_mode = "two", condition="train")
 
     # EMA Scheduler
     ema_scheduler = EMAScheduler(config)
@@ -71,6 +83,7 @@ def main():
     # Epochs
     kwargs = {'grad_clip': args['train'].grad_clip, 'print_freq': args['train'].print_freq}
     for epoch in range(start_epoch, epochs):
+        
         # One epoch's training
         logger.info('#' * 20 + f' << Epoch {epoch:3d} >> ' + '#' * 20)
         s_train_loss = None
@@ -96,9 +109,11 @@ def main():
             soft_update(t_model, s_model, ema_scheduler.get_tau(epoch))
         
         elif train_conf.soft_update_mode == "iter":
+            
             s_train_loss = softTeaching_every_iter(s_model=s_model,
                                     t_model=t_model,
-                                    dataloader=strong_aug_loader,
+                                    L_dataloader=L_aug_loader,
+                                    U_dataloader=U_aug_loader,
                                     criterion=criterion,
                                     optimizer=s_optimizer,
                                     logger=logger,
@@ -114,7 +129,7 @@ def main():
         assert s_train_loss is not None, "s_train_loss should not be None"
         utils.save_checkpoint(epoch, s_model.module, s_optimizer, s_train_loss, jobs_dir)
         
-        if epoch >= 5:
+        if epoch >= 0:
             result_filename = os.path.join(jobs_dir, f'Epoch{epoch:03d}_test_det.txt')
 
             # High min_score setting is important to guarantee reasonable number of detections
