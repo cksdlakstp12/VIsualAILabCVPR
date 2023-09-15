@@ -28,7 +28,7 @@ train.day = "all"
 train.img_set = f"Labeled_Unlabled_combine2.txt"
 train.teacher_img_set = "Unlabeled_90.txt"
 
-train.checkpoint = None ## Load chekpoint
+# train.checkpoint = None ## Load chekpoint
 
 train.batch_size = 6 # batch size
 
@@ -198,7 +198,7 @@ args["train"].baseline_transform = ComposeForST([ RandomHorizontalFlip(p=0.5),
                                             ], args=args)
 
 ema = edict()
-ema.use_scheduler = True
-ema.tau = 0.0001 # it also be start_tau when using scheduler
+ema.use_scheduler = False
+ema.tau = 0.0 # it also be start_tau when using scheduler
 ema.scheduling_start_epoch = 0
 ema.max_tau = 0.001

@@ -24,7 +24,7 @@ from utils.transforms import FusionDeadZone
 from utils.evaluation_script import evaluate
 from vis import visualize
 
-def softTeaching_every_iter(s_model: SSD300,
+def softTeaching_every_batch(s_model: SSD300,
                             t_model: SSD300,
                             dataloader: torch.utils.data.DataLoader,
                             criterion: MultiBoxLoss,

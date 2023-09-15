@@ -28,7 +28,7 @@ def initialize_state(n_classes, train_conf):
     optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
                                                             milestones=[int(train_conf.epochs * 0.5), int(train_conf.epochs * 0.9)],
                                                             gamma=0.1)
-    return model, optimizer, optim_scheduler
+    return model, optimizer, optim_scheduler, train_conf.start_epoch, None
 
 def load_state_from_checkpoint(train_conf, checkpoint):
     checkpoint = torch.load(checkpoint)
@@ -38,7 +38,7 @@ def load_state_from_checkpoint(train_conf, checkpoint):
     model = checkpoint['model']
     optimizer = checkpoint['optimizer']
     optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(train_conf.epochs * 0.5)], gamma=0.1)
-    return model, optimizer, optim_scheduler
+    return model, optimizer, optim_scheduler, start_epoch, train_loss
 
 def load_state(config, checkpoint): 
     args = config.args
@@ -46,11 +46,11 @@ def load_state(config, checkpoint):
 
     # Initialize model or load checkpoint
     if checkpoint is None:
-        model, optimizer, optim_scheduler = initialize_state(args.n_classes, train_conf)
+        model, optimizer, optim_scheduler, start_epoch, train_loss = initialize_state(args.n_classes, train_conf)
     else:
-        model, optimizer, optim_scheduler = load_state_from_checkpoint(train_conf, checkpoint)
+        model, optimizer, optim_scheduler, start_epoch, train_loss = load_state_from_checkpoint(train_conf, checkpoint)
 
-    return (model, optimizer, optim_scheduler)
+    return (model, optimizer, optim_scheduler, start_epoch, train_loss)
 
 def load_SoftTeacher(config):
     student_checkpoint = config.soft_teacher.student_checkpoint

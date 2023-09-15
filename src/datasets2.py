@@ -513,7 +513,7 @@ class KAISTPedWSEpoch(KAISTPed):
   
         return vis, lwir, vis_box, lwir_box, vis_labels, lwir_labels, index, is_anno
 
-class KAISTPedWSIter(KAISTPedWSEpoch):
+class KAISTPedWSBatch(KAISTPedWSEpoch):
     """KAIST Detection Dataset Object
     input is image, target is annotation
     Arguments:

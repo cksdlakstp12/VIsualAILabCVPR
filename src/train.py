@@ -6,8 +6,8 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 
-from datasets_2 import KAISTPed, KAISTPedWSEpoch, KAISTPedWSIter
-from run_epoch2 import val_epoch, save_results, train_epoch, softTeaching_every_iter
+from datasets2 import KAISTPed, KAISTPedWSEpoch, KAISTPedWSBatch
+from run_epoch2 import val_epoch, save_results, train_epoch, softTeaching_every_batch
 from model import MultiBoxLoss
 from train_utils import *
 from utils import utils
@@ -47,17 +47,8 @@ def main():
 
     # Initialize student model and load teacher checkpoint
 
-    s_model, s_optimizer, s_optim_scheduler, \
-    t_model, t_optimizer, t_optim_scheduler = load_SoftTeacher(config)
-    
-    if checkpoint is not None:
-        checkpoint = torch.load(checkpoint)
-        start_epoch = checkpoint['epoch'] + 1
-        s_train_loss = checkpoint['loss']
-        print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' % (start_epoch, s_train_loss))
-        s_model = checkpoint['model']
-        s_optimizer = checkpoint['optimizer']
-        s_optim_scheduler = torch.optim.lr_scheduler.MultiStepLR(s_optimizer, milestones=[int(train_conf.epochs * 0.5)], gamma=0.1)
+    s_model, s_optimizer, s_optim_scheduler, start_epoch, s_train_loss, \
+    t_model, t_optimizer, t_optim_scheduler, _, _ = load_SoftTeacher(config)
 
     # Move to default device
     s_model = s_model.to(device)
@@ -72,7 +63,7 @@ def main():
     strong_aug_dataset, strong_aug_loader = create_dataloader(config, KAISTPedWSEpoch, aug_mode="strong", condition="train")
     test_dataset, test_loader = create_dataloader(config, KAISTPed, condition="test")
     if train_conf.soft_update_mode == "iter":
-        strong_aug_dataset, L_aug_loader, U_aug_loader = create_dataloader(config, KAISTPedWSIter, sample_mode = "two", condition="train")
+        strong_aug_dataset, L_aug_loader, U_aug_loader = create_dataloader(config, KAISTPedWSBatch, sample_mode = "two", condition="train")
 
     # EMA Scheduler
     ema_scheduler = EMAScheduler(config)
@@ -108,9 +99,9 @@ def main():
             
             soft_update(t_model, s_model, ema_scheduler.get_tau(epoch))
         
-        elif train_conf.soft_update_mode == "iter":
+        elif train_conf.soft_update_mode == "batch":
             
-            s_train_loss = softTeaching_every_iter(s_model=s_model,
+            s_train_loss = softTeaching_every_batch(s_model=s_model,
                                     t_model=t_model,
                                     L_dataloader=L_aug_loader,
                                     U_dataloader=U_aug_loader,
@@ -123,7 +114,7 @@ def main():
             s_optim_scheduler.step()
         
         else:
-            raise Exception("You should choise train mode between batch or iter")
+            raise Exception("You should choise train mode between epoch or batch")
 
         # Save checkpoint
         assert s_train_loss is not None, "s_train_loss should not be None"
