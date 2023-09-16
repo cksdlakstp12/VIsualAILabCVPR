@@ -137,12 +137,7 @@ class EMAScheduler():
 
     @staticmethod
     def calc_tau(epoch, tau):
-        if epoch < 80:
-            return 0
-        #else:
-        #    tau = 0.0001
-        if epoch % 20 == 0:
-            return tau + 0.0001
+        tau = 0
         return tau
     
     def get_tau(self, epoch):
