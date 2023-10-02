@@ -113,7 +113,7 @@ def return_boxes_labels(temp_box, anno_index, boxes, labels):
 
             for i in range(len(lwir_boxes)) :
                 ##print(f"lwir : {lwir_boxes}\n")
-                name = lwir_boxes[i][0]
+                # name = lwir_boxes[i][0]
                 bndbox = [int(i) for i in lwir_boxes[i][0:4]]
                 bndbox[2] = min( bndbox[2] + bndbox[0], width )
                 bndbox[3] = min( bndbox[3] + bndbox[1], height )
@@ -194,8 +194,6 @@ def softTeaching_every_batch(s_model: SSD300,
 
     start = time.time()
 
-    co_transform = config.test.co_transform
-
     s_time = time.time()
 
     # Batches
@@ -206,19 +204,8 @@ def softTeaching_every_batch(s_model: SSD300,
         data_time.update(time.time() - start)
 
         # 두 DataLoader에서 가져온 텐서들을 합칩니다.
-        # w_image_vis = torch.cat((wL_image_vis, wU_image_vis), 0)
-        # w_image_lwir = torch.cat((wL_image_lwir, wU_image_lwir), 0)
-        # s_image_vis = torch.cat((sL_image_vis, sU_image_vis), 0)
-        # s_image_lwir = torch.cat((sL_image_lwir, sU_image_lwir), 0)
-        # at_w_image_vis = torch.cat((at_wL_image_vis, at_wU_image_vis), 0)
-        # at_w_image_lwir = torch.cat((at_wL_image_lwir, at_wU_image_lwir), 0)
-        w_image_vis = torch.FloatTensor(wU_image_vis)
-        w_image_lwir = torch.FloatTensor(wU_image_lwir)
         s_image_vis = torch.cat((sL_image_vis, sU_image_vis), 0)
         s_image_lwir = torch.cat((sL_image_lwir, sU_image_lwir), 0)
-        at_w_image_vis = torch.FloatTensor(at_wU_image_vis)
-        at_w_image_lwir = torch.FloatTensor(at_wU_image_lwir)
-        
         #vis_box = L_vis_box +  U_vis_box
         rgb_boxes = L_boxes +  U_boxes
         ir_boxes = L_boxes +  U_boxes
@@ -234,56 +221,50 @@ def softTeaching_every_batch(s_model: SSD300,
         #print(f"cluster_id : {cluster_id}")
 
         # Move to default device
-        w_image_vis = w_image_vis.to(device)
-        w_image_lwir = w_image_lwir.to(device)
         s_image_vis = s_image_vis.to(device)
         s_image_lwir = s_image_lwir.to(device)
-        at_w_image_vis = at_w_image_vis.to(device)
-        at_w_image_lwir = at_w_image_lwir.to(device)
-        
-        w_combined_vis = torch.cat((w_image_vis, at_w_image_vis, w_image_vis), 0)
-        w_combined_lwir = torch.cat((w_image_lwir, w_image_lwir, at_w_image_lwir), 0)
-        
+
         with torch.no_grad():
+            w_image_vis = wU_image_vis
+            w_image_lwir = wU_image_lwir
+            at_w_image_vis = at_wU_image_vis
+            at_w_image_lwir = at_wU_image_lwir
+            
+            w_image_vis = w_image_vis.to(device)
+            w_image_lwir = w_image_lwir.to(device)
+            at_w_image_vis = at_w_image_vis.to(device)
+            at_w_image_lwir = at_w_image_lwir.to(device)
+            
+            w_combined_vis = torch.cat((w_image_vis, at_w_image_vis, w_image_vis), 0)
+            w_combined_lwir = torch.cat((w_image_lwir, w_image_lwir, at_w_image_lwir), 0)
+
             locs, scores = t_model(w_combined_vis, w_combined_lwir)
 
             bs = w_image_vis.size(0)
-            predicted_locs, predicted_scores = locs[:bs], scores[:bs]
-            rgb_at_predicted_locs, rgb_at_predicted_scores = locs[bs:2*bs], scores[bs:2*bs]
-            lwir_at_predicted_locs, lwir_at_predicted_scores = locs[2*bs:], scores[2*bs:]
+            predicted_locs, predicted_scores = locs[:bs].clone(), scores[:bs].clone()
+            rgb_at_predicted_locs, rgb_at_predicted_scores = locs[bs:2*bs].clone(), scores[bs:2*bs].clone()
+            lwir_at_predicted_locs, lwir_at_predicted_scores = locs[2*bs:].clone(), scores[2*bs:].clone()
 
             whole_anno_index = [index for index, anno in enumerate(is_anno) if not anno]
             anno_index = [index for index, anno in enumerate(U_is_anno) if not anno]
             # len_anno = len(anno_index)
 
-            # predicted_locs_non = predicted_locs[anno_index]
-            # predicted_scores_non = predicted_scores[anno_index]
-            # rgb_at_predicted_locs_non = rgb_at_predicted_locs[anno_index]
-            # rgb_at_predicted_scores_non = rgb_at_predicted_scores[anno_index]
-            # lwir_at_predicted_locs_non = lwir_at_predicted_locs[anno_index]
-            # lwir_at_predicted_scores_non = lwir_at_predicted_scores[anno_index]
-
-            # input_size = config.test.input_size
-            # height, width = input_size
-            # xyxy_scaler_np = np.array([[width, height, width, height]], dtype=np.float32)
-
             # Detect objects in SSD output
-            # detections = t_model.module.detect_objects(locs, scores,
+            # all_images_boxes, all_images_labels, all_images_scores = t_model.module.detect_objects_cuda(locs, scores,
             #                                         min_score=0.1, max_overlap=0.425, top_k=200)
-            detections = t_model.module.detect_objects(predicted_locs, predicted_scores,
+            detections = t_model.module.detect_objects_cuda(predicted_locs, predicted_scores,
                                                     min_score=0.1, max_overlap=0.425, top_k=200)
-            rgb_at_detections = t_model.module.detect_objects(rgb_at_predicted_locs, rgb_at_predicted_scores,
+            rgb_at_detections = t_model.module.detect_objects_cuda(rgb_at_predicted_locs, rgb_at_predicted_scores,
                                                             min_score=0.1, max_overlap=0.425, top_k=200)
-            lwir_at_detections = t_model.module.detect_objects(lwir_at_predicted_locs, lwir_at_predicted_scores,
+            lwir_at_detections = t_model.module.detect_objects_cuda(lwir_at_predicted_locs, lwir_at_predicted_scores,
                                                                 min_score=0.1, max_overlap=0.425, top_k=200)
-
-            # all_images_boxes, all_images_labels, all_images_scores = detections[:3]
-            # temp_box = detect([all_images_boxes[:len_anno], all_images_labels[:len_anno], all_images_scores[:len_anno]], anno_index)
-            # at_rgb_temp_box = detect([all_images_boxes[len_anno:2*len_anno], all_images_labels[len_anno:2*len_anno], all_images_scores[len_anno:2*len_anno]], anno_index)
-            # at_lwir_temp_box = detect([all_images_boxes[2*len_anno:], all_images_labels[2*len_anno:], all_images_scores[2*len_anno:]], anno_index)
+            
             temp_box = detect(detections, anno_index)
             at_rgb_temp_box = detect(rgb_at_detections, anno_index)
             at_lwir_temp_box = detect(lwir_at_detections, anno_index)
+            # temp_box = detect([all_images_boxes[:len_anno], all_images_labels[:len_anno], all_images_scores[:len_anno]], anno_index)
+            # at_rgb_temp_box = detect([all_images_boxes[len_anno:2*len_anno], all_images_labels[len_anno:2*len_anno], all_images_scores[len_anno:2*len_anno]], anno_index)
+            # at_lwir_temp_box = detect([all_images_boxes[2*len_anno:], all_images_labels[2*len_anno:], all_images_scores[2*len_anno:]], anno_index)
 
             #print()
             #print(f"RGB_AT_box : {at_rgb_temp_box}")
@@ -291,7 +272,7 @@ def softTeaching_every_batch(s_model: SSD300,
             #print(f"Combine_box : {combine_box}")
             #print(f"Normal_box : {temp_box}")
             #print()
-            
+
             rgb_weight_mean = 0
             lwir_weight_mean = 0
 
@@ -450,8 +431,6 @@ def softTeaching_every_batch(s_model: SSD300,
 
         # Print status
         if batch_idx % kwargs.get('print_freq', 10) == 0:
-            print(f"{kwargs.get('print_freq', 10)} iters run time : {time.time() - s_time}")
-            s_time = time.time()
             logger.info('Iteration: [{0}/{1}]\t'
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'

@@ -628,6 +628,60 @@ class SSD300(nn.Module):
             # all_images_bg_scores.append(image_bg_scores)
 
         return all_images_boxes, all_images_labels, all_images_scores#, all_images_bg_scores  # lists of length batch_size
+    
+    def detect_objects_cuda(self, predicted_locs, predicted_scores, min_score, max_overlap, top_k):
+        """
+        Decipher the 8732 locations and class scores (output of ths SSD300) to detect objects.
+        For each class, perform Non-Maximum Suppression (NMS) on boxes that are above a minimum threshold.
+        """
+        batch_size = predicted_locs.size(0)
+        n_priors = self.priors_cxcy.size(0)
+        predicted_scores = torch.sigmoid(predicted_scores)
+
+        # Lists to store final predicted boxes, labels, and scores for all images
+        all_images_boxes = []
+        all_images_labels = []
+        all_images_scores = []
+
+        assert n_priors == predicted_locs.size(1) == predicted_scores.size(1)
+
+        for i in range(batch_size):
+            # Decode object coordinates from the form we regressed predicted boxes to
+            decoded_locs = cxcy_to_xy(gcxgcy_to_cxcy(predicted_locs[i], self.priors_cxcy)) 
+
+            predicted_fg_scores = predicted_scores[i][:,1:].mean(dim=1)
+            score_above_min_score = predicted_fg_scores > min_score
+
+            class_scores = predicted_scores[i][:,1:][score_above_min_score]
+            class_decoded_locs = decoded_locs[score_above_min_score]
+
+            # Sort predicted boxes and scores by scores
+            _, sort_ind = class_scores.mean(dim=1).sort(dim=0, descending=True)
+            class_scores = class_scores[sort_ind]
+            class_decoded_locs = class_decoded_locs[sort_ind]
+
+            # torchvision의 nms 함수를 사용하여 NMS 수행
+            keep = torchvision.ops.nms(class_decoded_locs, class_scores.mean(dim=1), max_overlap)
+
+            # NMS를 통과한 박스, 라벨, 점수만 선택
+            image_boxes = class_decoded_locs[keep]
+            image_labels = torch.ones(keep.size(0), device=class_decoded_locs.device)
+            image_scores = class_scores[keep]
+
+            # top_k만큼만 유지
+            if image_scores.size(0) > top_k:
+                _, indices = image_scores.mean(dim=1).sort(descending=True)
+                indices = indices[:top_k]
+                image_boxes = image_boxes[indices]
+                image_labels = image_labels[indices]
+                image_scores = image_scores[indices]
+
+            # 결과 저장
+            all_images_boxes.append(image_boxes)
+            all_images_labels.append(image_labels)
+            all_images_scores.append(image_scores)
+
+        return all_images_boxes, all_images_labels, all_images_scores
 
 
 class MultiBoxLoss(nn.Module):
