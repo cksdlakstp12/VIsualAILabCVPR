@@ -736,8 +736,6 @@ class KAISTPedWSBatch(KAISTPedWSEpoch):
                     if len(boxes_lwir.shape) != 1 :
                         boxes_lwir[1:,4] = 2
                     
-                #print("boxes_vis :", boxes_vis)
-                #print("boxes_lwir : ", boxes_lwir)
                 boxes = torch.cat((boxes_vis,boxes_lwir), dim=0)
                 ##print("before : ",boxes)
                 boxes = torch.tensor(list(map(list,set([tuple(bb) for bb in boxes.numpy()])))) 
@@ -768,12 +766,7 @@ class KAISTPedWSBatch(KAISTPedWSEpoch):
         
         labels = boxes[:,4]
         boxes_t = boxes[:,0:4]
-        #if is_annotation == False:
-        #print("isanno / vis_labels : ", is_annotation ,vis_labels)
-        #print("isanno / lwir_labels : ", is_annotation, lwir_labels)
-        ##print(f"boxes_t : {boxes_t}")
-
-        # return vis, lwir, vis, lwir, vis, lwir, vis, lwir, boxes_t, labels, is_annotation, cluster_id
+        
         return vis, lwir, vis, lwir, boxes_t, labels, is_annotation, cluster_id
     
     def collate_fn(self, batch):

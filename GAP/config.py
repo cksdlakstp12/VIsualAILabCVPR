@@ -55,7 +55,7 @@ train.grad_clip = None  # clip if gradients are exploding, which may happen at l
 
 train.min_score = 0.5
 
-train.print_freq = 100   
+train.print_freq = 100
 
 train.annotation = "AR-CNN" # AR-CNN, Sanitize, Original 
 

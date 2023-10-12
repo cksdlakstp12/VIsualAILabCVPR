@@ -175,73 +175,60 @@ def load_mean_std_dict(dict_path):
         loaded_data = pickle.load(file)
     return loaded_data
 
-def translate_coordinate(box, feature_w, feature_h, ori_w, ori_h):
+def translate_coordinate(box, feature_w, feature_h, ori_w, ori_h, is_GT):
     x, y, w, h = box
-    new_x = int(x / ori_w * feature_w)
-    new_y = int(y / ori_h * feature_h)
-    new_w = int(w / ori_w * feature_w)
-    new_h = int(h / ori_h * feature_h)
+    new_x = int(x * feature_w) if is_GT else int(x / ori_w * feature_w)
+    new_y = int(y * feature_h) if is_GT else int(y / ori_h * feature_h)
+    new_w = int(w * feature_w) if is_GT else int(w / ori_w * feature_w)
+    new_h = int(h * feature_h) if is_GT else int(h / ori_h * feature_h)
     return new_x, new_y, new_w, new_h
 
 def split_features(features, len_L):
-    L_features = list()
-    U_features = list()
-    for feature in features:
-        L_feature = feature[:len_L]
-        U_feature = feature[len_L:]
-        L_features.append(L_feature)
-        U_features.append(U_feature)
+    L_features = [feature[:len_L] for feature in features]
+    U_features = [feature[len_L:] for feature in features]
     return L_features, U_features
 
-def calc_weight_by_GAPVector_distance(features, GT, PL, len_L, input_size, device):
-        ori_h, ori_w = input_size
-        with torch.no_grad():
-            L_features, U_features = split_features(features, len_L)
-            per_image_mean_gaps_GT = torch.empty((0, 512)).to(device)
-            for idx, boxes in enumerate(GT):
-                mean_gaps = torch.empty((0, 512)).to(device)
-                for box in boxes:
-                    if box[0] == 0 and box[1] == 0 and box[2] == 0 and box[3] == 0: continue
-                    gaps = torch.empty((0, 512)).to(device)
-                    for features in L_features:
-                        feature = features[idx]
-                        _, feature_h, feature_w = feature.size()
-                        print(_, feature_h, feature_w)
-                        print(box)
-                        x, y, w, h = translate_coordinate(box, feature_w, feature_h, ori_w, ori_h)
-                        print(x, y, w, h)
-                        obj = feature[:, y:y+h, x:x+w]
-                        gap_obj = F.avg_pool2d(obj.unsqueeze(0), kernel_size=obj.size()[1:]).squeeze(0)
-                        gaps = torch.cat((gaps, gap_obj), dim=0)
+def compute_gap_from_features(features, box, ori_w, ori_h, idx, is_GT):
+    gaps = []
+    for feature in features:
+        feature = feature[idx]
+        _, feature_h, feature_w = feature.size()
+        x, y, w, h = translate_coordinate(box, feature_w, feature_h, ori_w, ori_h, is_GT)
+        obj = feature[:, y:y+h, x:x+w]
+        if obj.size(1) > 0 and obj.size(2) > 0:
+            gap_obj = F.avg_pool2d(obj.unsqueeze(0), kernel_size=obj.size()[1:]).squeeze()
+            gaps.append(gap_obj)
+    if not gaps:  # Check if gaps is empty
+        return None
+    return torch.mean(torch.stack(gaps), dim=0)
 
-                    mean_gap = torch.mean(gaps, dim=0)
-                    mean_gaps = torch.cat((mean_gaps, mean_gap), dim=0)
+def calc_weight_by_GAPVector_distance(features, GT, PL, len_L, input_size):
+    ori_h, ori_w = input_size
+    L_features, U_features = split_features(features, len_L)
 
-                per_image_mean_gap = torch.mean(mean_gaps, dim=0)
-                per_image_mean_gaps_GT = torch.cat((per_image_mean_gaps_GT, per_image_mean_gap), dim=0)
+    per_image_mean_gaps_GT = []
+    for idx, boxes in enumerate(GT):
+        if len(boxes) <= 1: continue
+        mean_gaps = [gap for gap in (compute_gap_from_features(L_features, box, ori_w, ori_h, idx, True) for box in boxes[1:]) if gap is not None]
+        if mean_gaps:  # Check if mean_gaps is not empty
+            per_image_mean_gaps_GT.append(torch.mean(torch.stack(mean_gaps), dim=0))
 
-            per_image_mean_gaps_PL = torch.empty((0, 512)).to(device)
-            for idx, boxes in PL.items():
-                for box in boxes:
-                    gaps = torch.empty((0, 512)).to(device)
-                    for features in U_features:
-                        feature = features[idx]
-                        _, feature_h, feature_w = feature.size()
-                        x, y, w, h = translate_coordinate(box, feature_w, feature_h, ori_w, ori_h)
-                        obj = feature[:, y:y+h, x:x+w]
-                        gap_obj = F.avg_pool2d(obj.unsqueeze(0), kernel_size=obj.size()[1:]).squeeze(0)
-                        gaps = torch.cat((gaps, gap_obj), dim=0)
+    per_image_mean_gaps_PL = []
+    for idx, boxes in PL.items():
+        mean_gaps = [gap for gap in (compute_gap_from_features(U_features, box, ori_w, ori_h, idx, False) for box in boxes) if gap is not None]
+        if mean_gaps:  # Check if mean_gaps is not empty
+            per_image_mean_gaps_PL.append(torch.mean(torch.stack(mean_gaps), dim=0))
 
-                    mean_gap = torch.mean(gaps, dim=0)
-                    mean_gaps = torch.cat((mean_gaps, mean_gap), dim=0)
-
-                per_image_mean_gap = torch.mean(mean_gaps, dim=0)
-                per_image_mean_gaps_PL = torch.cat((per_image_mean_gaps_PL, per_image_mean_gap), dim=0)
-            
-            mse = torch.sqrt(torch.sum((
-                per_image_mean_gaps_GT - per_image_mean_gaps_PL
-            ) ** 2, dim=1))
-            mse_norm = torch.mean(mse).item()
-            # weight = mse_norm
-            weight = np.exp(-mse_norm)
-            return weight
+    if per_image_mean_gaps_GT and per_image_mean_gaps_PL:  # Check if both lists are not empty
+        per_image_mean_gaps_GT = torch.mean(torch.stack(per_image_mean_gaps_GT), dim=0)
+        per_image_mean_gaps_PL = torch.mean(torch.stack(per_image_mean_gaps_PL), dim=0)    
+        
+        mse = torch.sqrt(torch.sum((per_image_mean_gaps_GT - per_image_mean_gaps_PL) ** 2, dim=0))
+        mse_norm = torch.mean(mse).item()
+        weight = np.exp(-mse_norm)
+        return weight
+    else:
+        # Handle the case where one or both of the lists are empty
+        # You can return a default weight or handle it in another way depending on your requirements
+        return 0.0  # Default weight
+    

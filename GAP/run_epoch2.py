@@ -154,20 +154,15 @@ def softTeaching_every_batch(s_model: SSD300,
         data_time.update(time.time() - start)
 
         # 두 DataLoader에서 가져온 텐서들을 합칩니다.
-        s_image_vis = torch.cat((sL_image_vis, sU_image_vis), 0)
-        s_image_lwir = torch.cat((sL_image_lwir, sU_image_lwir), 0)
+        s_image_vis = torch.cat((sL_image_vis, sU_image_vis), 0).to(device)
+        s_image_lwir = torch.cat((sL_image_lwir, sU_image_lwir), 0).to(device)
 
-        # Move to default device
-        s_image_vis = s_image_vis.to(device)
-        s_image_lwir = s_image_lwir.to(device)
         with torch.no_grad():
             w_image_vis = wU_image_vis.to(device)
             w_image_lwir = wU_image_lwir.to(device)
 
             # inference
-            s_time = time.time()
             locs, scores, _ = t_model(w_image_vis, w_image_lwir)
-            print(f"teacher inference time : {time.time() - s_time}")
 
             # Detect objects in SSD output
             teacher_inference = t_model.module.detect_objects_cuda(locs, scores, min_score=0.1, max_overlap=0.425, top_k=200)
@@ -176,9 +171,7 @@ def softTeaching_every_batch(s_model: SSD300,
             id_box_dict, pseudo_boxes, pseudo_labels = detect(teacher_inference, len(U_is_anno))
 
         # Forward prop.
-        s_time = time.time()
         student_locs, student_scores, features = s_model(s_image_vis, s_image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
-        print(f"student inference time : {time.time() - s_time}")
 
         # split results as sup and unsup
         sup_locs, un_locs = student_locs[:len(L_boxes)], student_locs[len(L_boxes):]
@@ -206,12 +199,7 @@ def softTeaching_every_batch(s_model: SSD300,
         un_loss, un_cls_loss, un_loc_loss, un_n_positives = criterion(un_predicted_locs, un_predicted_scores, un_boxes, un_labels)
 
         # Now compute the losses
-        s_time = time.time()
-        print(L_boxes)
-        print(L_labels)
-        weight =  calc_weight_by_GAPVector_distance(features, L_boxes, id_box_dict, len(L_boxes), config.test.input_size, device)
-        print(f"calc weight time : {time.time() - s_time}")
-        print(f"weight : {weight}")
+        weight =  calc_weight_by_GAPVector_distance(features, L_boxes, id_box_dict, len(L_boxes), config.test.input_size)
         loss = sup_loss + weight * un_loss
         
         # Backward prop.
@@ -234,36 +222,15 @@ def softTeaching_every_batch(s_model: SSD300,
 
         # Print status
         if batch_idx % kwargs.get('print_freq', 10) == 0:
+            print(f"weight : {weight}")
             logger.info('Iteration: [{0}/{1}]\t'
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                        #'sup_vis_cls_loss {sup_vis_cls_loss}\t'
-                        #'sup_vis_loc_loss {sup_vis_loc_loss}\t'
-                        #'sup_lwir_cls_loss {sup_lwir_cls_loss}\t'
-                        #'sup_lwir_loc_loss {sup_lwir_loc_loss}\t'
-                        #'un_vis_cls_loss {un_vis_cls_loss}\t'
-                        #'un_vis_loc_loss {un_vis_loc_loss}\t'
-                        #'un_lwir_cls_loss {un_lwir_cls_loss}\t'
-                        #'un_lwir_loc_loss {un_lwir_loc_loss}\t'
-                        #'cls mse loss {cls_mse_loss}\t'
-                        #'loc mse loss {loc_mse_loss}\t'
-                        #'is_anno {is_anno}\t'
-                        'num of Positive {sup_n_positives} {un_n_positives} {un_lwir_n_positives}\t'.format(batch_idx, len(U_dataloader),
+                        'num of Positive {sup_n_positives} {un_n_positives}\t'.format(batch_idx, len(U_dataloader),
                                                               batch_time=batch_time,
                                                               data_time=data_time,
                                                               loss=losses_sum,
-                                                              #sup_vis_cls_loss=sup_vis_cls_loss,
-                                                              #sup_vis_loc_loss=sup_vis_loc_loss,
-                                                              #sup_lwir_cls_loss=sup_lwir_cls_loss,
-                                                              #sup_lwir_loc_loss=sup_lwir_loc_loss,
-                                                              #un_vis_cls_loss=un_vis_cls_loss,
-                                                              #un_vis_loc_loss=un_vis_loc_loss,
-                                                              #un_lwir_cls_loss=un_lwir_cls_loss,
-                                                              #un_lwir_loc_loss=un_lwir_loc_loss,
-                                                              #cls_mse_loss=F.mse_loss(un_vis_cls_loss.float(), un_lwir_cls_loss.float()),
-                                                              #loc_mse_loss=F.mse_loss(un_vis_loc_loss.float(), un_lwir_loc_loss.float()),
-                                                              #is_anno=is_anno,
                                                               sup_n_positives=sup_n_positives,
                                                               un_n_positives=un_n_positives))
     
