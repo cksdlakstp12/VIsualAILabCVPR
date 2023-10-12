@@ -195,7 +195,7 @@ def compute_gap_from_features(features, box, ori_w, ori_h, idx, is_GT):
         _, feature_h, feature_w = feature.size()
         x, y, w, h = translate_coordinate(box, feature_w, feature_h, ori_w, ori_h, is_GT)
         obj = feature[:, y:y+h, x:x+w]
-        if obj.size(1) > 0 and obj.size(2) > 0:
+        if obj.size(1) > 0 or obj.size(2) > 0:
             gap_obj = F.avg_pool2d(obj.unsqueeze(0), kernel_size=obj.size()[1:]).squeeze()
             gaps.append(gap_obj)
     if not gaps:  # Check if gaps is empty
