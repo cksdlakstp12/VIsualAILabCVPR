@@ -222,7 +222,6 @@ def softTeaching_every_batch(s_model: SSD300,
 
         # Print status
         if batch_idx % kwargs.get('print_freq', 10) == 0:
-            print(f"weight : {weight}")
             logger.info('Iteration: [{0}/{1}]\t'
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
@@ -436,7 +435,7 @@ def val_epoch(model: SSD300, dataloader: DataLoader, dataset_type: str, input_si
             image_lwir = image_lwir.to(device)
 
             # Forward prop.
-            predicted_locs, predicted_scores = model(image_vis, image_lwir)
+            predicted_locs, predicted_scores, _ = model(image_vis, image_lwir)
 
             # Detect objects in SSD output
             detections = model.module.detect_objects(predicted_locs, predicted_scores,
