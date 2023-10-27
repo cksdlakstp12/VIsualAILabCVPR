@@ -12,7 +12,7 @@ from utils.transforms_case1 import *
 PATH = edict()
 
 PATH.DB_ROOT = '../../data/CVC-14'
-PATH.JSON_GT_FILE = os.path.join('../kaist_annotations_test20.json' )
+PATH.JSON_GT_FILE = os.path.join('../CVC14_annotations_test.json' )
 
 # train
 train = edict()
@@ -52,7 +52,7 @@ test.img_set = f"test-all-20.txt"
 
 test.annotation = "AR-CNN"
 
-test.input_size = [512., 640.]
+test.input_size = [471., 640.]
 
 ### test model ~ eval.py
 test.checkpoint = "./jobs/best_checkpoint.pth.tar"
