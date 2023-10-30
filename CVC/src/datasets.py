@@ -40,55 +40,43 @@ class KAISTPed(data.Dataset):
         self.cond = args.dataset.OBJ_LOAD_CONDITIONS[condition]
         self.annotation = args[condition].annotation
         self._parser = LoadBox()
-        self.data = "KAIST"
+        self.data = args.dataset_type
 
-        if self.mode == "train":
-            if self.data  == "KAIST":
-                self.ids = list()
-                for line in open(os.path.join('../imageSets', self.image_set)):
-                    self.ids.append(('../../data/kaist-rgbt/', line.strip().split('/')))
-                    ##print(self.ids)
-                self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
-                self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
-            else:
-                self.ids = list()
-                for line in open("./cleaned_file_paths.txt"):
-                    self.ids.append((self.args.path.DB_ROOT, line.strip().split('/')))
-                
-                self._annopath = os.path.join('%s', '%s', '%s', 'Train', 'Annotations', '%s.txt')
-
-                self._imgpath = os.path.join('%s', '%s', '%s', 'Train', '%s', '%s.tif')
-        else:
+        if self.data  == "KAIST":
             self.ids = list()
-            for line in open(os.path.join('../imageSets', self.image_set)):
-                self.ids.append(('../../data/kaist-rgbt/', line.strip().split('/')))
-                ##print(self.ids)
+            for line in open(os.path.join('./imageSets', self.image_set)):
+                self.ids.append(('../data/kaist-rgbt/', line.strip().split('/')))
+                #print(self.ids)
             self._annopath = os.path.join('%s', 'annotations_paired', '%s', '%s', '%s', '%s.txt')
             self._imgpath = os.path.join('%s', 'images', '%s', '%s', '%s', '%s.jpg')
+        else:
+            self.ids = list()
+            for line in open(os.path.join('./imageSets', self.image_set)):
+                self.ids.append((self.args.path.DB_ROOT, line.strip().split('/')))
             
-
-        ##print(self.ids)
+            self._annopath = os.path.join('%s', '%s', '%s', 'Train', 'Annotations', '%s.txt')
+            self._imgpath = os.path.join('%s', '%s', '%s', 'Train', 'FramesPos', '%s.tif')
+            self._testimgpath = os.path.join('%s', '%s', '%s', 'NewTest', 'FramesPos', '%s.tif')
+            
+        #print(self.ids)
         print(self.mode)
         print(self.image_set)
-        print(self.data)
         
-
     def __str__(self):
         return self.__class__.__name__ + '_' + self.image_set
 
     def __getitem__(self, index): 
 
-        vis, lwir, vis_box, lwir_box, vis_labels,lwir_labels = self.pull_item(index)
-        ##print(self.ids[index])
-        ##print(vis, lwir, boxes, labels, torch.ones(1,dtype=torch.int)*index, self.ids[index])
-        return vis, lwir, vis_box,lwir_box, vis_labels,lwir_labels, torch.ones(1,dtype=torch.int)*index
+        vis, lwir, boxes, labels = self.pull_item(index)
+        #print(self.ids[index])
+        #print(vis, lwir, boxes, labels, torch.ones(1,dtype=torch.int)*index, self.ids[index])
+        return vis, lwir, boxes, labels, torch.ones(1,dtype=torch.int)*index
 
     def pull_item(self, index):
         
         if self.mode == 'train':
             if self.data == "KAIST":
                 frame_id = self.ids[index]
-                ##print(frame_id)
                 set_id, vid_id, img_id = frame_id[-1]
 
                 vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id ))
@@ -99,97 +87,69 @@ class KAISTPed(data.Dataset):
                 frame_id = self.ids[index]
                 set_id, vid_id, img_id = frame_id[-1]
 
-                vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, 'Visible', vid_id, img_id )).convert("RGB")
-                ##print(self._imgpath)
-                lwir = Image.open( self._imgpath % ( *frame_id[:-1], set_id, 'FIR', vid_id, img_id ) ).convert('L')
+                vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, 'Visible', img_id )).convert("RGB")
+                lwir = Image.open( self._imgpath % ( *frame_id[:-1], set_id, 'FIR', img_id ) ).convert('L')
 
-                ##print(self._imgpath)
-            
                 width, height = lwir.size
         else:
-            frame_id = self.ids[index]
-            ##print(frame_id)
-            set_id, vid_id, img_id = frame_id[-1]
+            if self.data == "KAIST":
+                frame_id = self.ids[index]
+                set_id, vid_id, img_id = frame_id[-1]
 
-            vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id ))
-            lwir = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id ) ).convert('L')
-        
-            width, height = lwir.size
+                vis = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id ))
+                lwir = Image.open( self._imgpath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id ) ).convert('L')
+            
+                width, height = lwir.size
+            else: 
+                frame_id = self.ids[index]
+                set_id, vid_id, img_id = frame_id[-1]
+
+                vis = Image.open( self._testimgpath % ( *frame_id[:-1], set_id, 'Visible', img_id )).convert("RGB")
+                lwir = Image.open( self._testimgpath % ( *frame_id[:-1], set_id, 'FIR', img_id ) ).convert('L')
+
+                width, height = lwir.size
 
         # paired annotation
         if self.mode == 'train': 
-            if self.data == "KAIST":
-                vis_boxes = list()
-                lwir_boxes = list()
-                for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'visible', img_id )) :
-                    vis_boxes.append(line.strip().split(' '))
-                for line in open(self._annopath % ( *frame_id[:-1], set_id, vid_id, 'lwir', img_id)) :
-                    lwir_boxes.append(line.strip().split(' '))
-            else:
-                vis_boxes = list()
-                lwir_boxes = list()
-                if vid_id == "FramesPos":
-                    if set_id == "Night":
-                        for line in open(self._annopath % ( *frame_id[:-1], set_id, 'Visible',img_id)) :
-                            vis_boxes.append(line.strip().split())
-                        for line in open(self._annopath % ( *frame_id[:-1], set_id, 'FIR', img_id)) :
-                            lwir_boxes.append(line.strip().split())
-                    elif set_id == "Day":
-                        for line in open(self._annopath % ( *frame_id[:-1], set_id, 'Visible',img_id )) :
-                            vis_boxes.append(line.strip().split())
-                        for line in open(self._annopath % ( *frame_id[:-1], set_id, 'FIR', img_id)) :
-                            lwir_boxes.append(line.strip().split())
+            vis_boxes = list()
+            lwir_boxes = list()
+            if vid_id == "FramesPos":
+                for line in open(self._annopath % ( *frame_id[:-1], set_id, 'Visible',img_id)) :
+                    vis_boxes.append(line.strip().split())
+                for line in open(self._annopath % ( *frame_id[:-1], set_id, 'FIR', img_id)) :
+                    lwir_boxes.append(line.strip().split())
             
-            vis_boxes = vis_boxes[1:]
-            lwir_boxes = lwir_boxes[1:]
-
-            #print("vis_boxes :", vis_boxes)
-            #print("lwir_boxes :", lwir_boxes)
+            compatibility_index = 0
+            if self.data == "KAIST":
+                vis_boxes = vis_boxes[1:]
+                lwir_boxes = lwir_boxes[1:]
+                compatibility_index = 1
 
             boxes_vis = [[0, 0, 0, 0, -1]]
             boxes_lwir = [[0, 0, 0, 0, -1]]
 
-            if self.data == "KAIST":
-                for i in range(len(vis_boxes)):
-                    bndbox = [int(i) for i in vis_boxes[i][1:5]]
-                    bndbox[2] = min( bndbox[2] + bndbox[0], width )
-                    bndbox[3] = min( bndbox[3] + bndbox[1], height )
-                    bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
-                    bndbox.append(1)
-                    boxes_vis += [bndbox]
+            for i in range(len(vis_boxes)):
+                try:
+                    bndbox = [int(val) for val in vis_boxes[i][0+compatibility_index:4+compatibility_index]]
+                except ValueError:
+                    print(f"Error in converting value at index {i} with value {vis_boxes[i][0+compatibility_index:4+compatibility_index]} , {set_id}, {img_id}")
+                    raise
+                bndbox = [int(i) for i in vis_boxes[i][0+compatibility_index:4+compatibility_index]]
+                bndbox[2] = min( bndbox[2] + bndbox[0], width )
+                bndbox[3] = min( bndbox[3] + bndbox[1], height )
+                bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
+                bndbox.append(1)
+                boxes_vis += [bndbox]
 
-                for i in range(len(lwir_boxes)) :
-                    ##print(f"lwir : {lwir_boxes}\n")
-                    name = lwir_boxes[i][0]
-                    bndbox = [int(i) for i in lwir_boxes[i][1:5]]
-                    bndbox[2] = min( bndbox[2] + bndbox[0], width )
-                    bndbox[3] = min( bndbox[3] + bndbox[1], height )
-                    bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
-                    bndbox.append(1)
-                    boxes_lwir += [bndbox]
-            else:
-                for i in range(len(vis_boxes)):
-                    try:
-                        bndbox = [int(val) for val in vis_boxes[i][0:4]]
-                    except ValueError:
-                        #print(f"Error in converting value at index {i} with value {vis_boxes[i][0:4]} , {set_id}, {img_id}")
-                        raise
-                    bndbox = [int(i) for i in vis_boxes[i][0:4]]
-                    bndbox[2] = min( bndbox[2] + bndbox[0], width )
-                    bndbox[3] = min( bndbox[3] + bndbox[1], height )
-                    bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
-                    bndbox.append(1)
-                    boxes_vis += [bndbox]
-
-                for i in range(len(lwir_boxes)) :
-                    ##print(f"lwir : {lwir_boxes}\n")
-                    name = lwir_boxes[i][0]
-                    bndbox = [int(i) for i in lwir_boxes[i][0:4]]
-                    bndbox[2] = min( bndbox[2] + bndbox[0], width )
-                    bndbox[3] = min( bndbox[3] + bndbox[1], height )
-                    bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
-                    bndbox.append(1)
-                    boxes_lwir += [bndbox]
+            for i in range(len(lwir_boxes)) :
+                #print(f"lwir : {lwir_boxes}\n")
+                name = lwir_boxes[i][0]
+                bndbox = [int(i) for i in lwir_boxes[i][0:4]]
+                bndbox[2] = min( bndbox[2] + bndbox[0], width )
+                bndbox[3] = min( bndbox[3] + bndbox[1], height )
+                bndbox = [ cur_pt / width if i % 2 == 0 else cur_pt / height for i, cur_pt in enumerate(bndbox) ]
+                bndbox.append(1)
+                boxes_lwir += [bndbox]
 
             boxes_vis = np.array(boxes_vis, dtype=np.float)
             boxes_lwir = np.array(boxes_lwir, dtype=np.float)
@@ -205,7 +165,7 @@ class KAISTPed(data.Dataset):
 
         ## Apply transforms
         if self.img_transform is not None:
-            vis, lwir, boxes_vis , boxes_lwir, _ = self.img_transform(vis, lwir, boxes_vis, boxes_lwir)
+            vis, lwir, boxes_vis, boxes_lwir, _ = self.img_transform(vis, lwir, boxes_vis, boxes_lwir)
 
         if self.co_transform is not None:
             
@@ -213,10 +173,10 @@ class KAISTPed(data.Dataset):
 
             vis, lwir, boxes_vis, boxes_lwir, pair = self.co_transform(vis, lwir, boxes_vis, boxes_lwir, pair)                      
             if boxes_vis is None:
-                #print("vis none")
+                print("vis none")
                 boxes = boxes_lwir
             elif boxes_lwir is None:
-                #print("lwir none")
+                print("lwir none")
                 boxes = boxes_vis
             else : 
                 ## Pair Condition
@@ -225,35 +185,29 @@ class KAISTPed(data.Dataset):
                 ##  0  /  1  = 2
                 ##  1  /  1  = 3
                 if pair == 1 :
-                    #print("페어긴함")
-                    #print("Before vis_box : ", boxes_vis)
-                    #print("Befor lwir_box : ", boxes_lwir)
                     if len(boxes_vis.shape) != 1 :
                         boxes_vis[1:,4] = 3
                     if len(boxes_lwir.shape) != 1 :
                         boxes_lwir[1:,4] = 3
-                    #print("after vis_box : ", boxes_vis)
-                    #print("after lwir_box : ", boxes_lwir)
-                else :
-                    #print("페어가 아님?!")
+                else : 
+                    
                     if len(boxes_vis.shape) != 1 :
                         boxes_vis[1:,4] = 1
                     if len(boxes_lwir.shape) != 1 :
                         boxes_lwir[1:,4] = 2
                 #print("boxes_vis :", boxes_vis)
                 #print("boxes_lwir : ", boxes_lwir)
-                #boxes = torch.cat((boxes_vis,boxes_lwir), dim=0)
-                ##print("before : ",boxes)
-                #boxes = torch.tensor(list(map(list,set([tuple(bb) for bb in boxes.numpy()])))) 
-                ##print("after : ",boxes)
+                boxes = torch.cat((boxes_vis,boxes_lwir), dim=0)
+                #print("before : ",boxes)
+                boxes = torch.tensor(list(map(list,set([tuple(bb) for bb in boxes.numpy()])))) 
+                #print("after : ",boxes)
 
         ## Set ignore flags
-        ignore_vis = torch.zeros(boxes_vis.size(0), dtype=torch.bool)
-        ignore_lwir = torch.zeros(boxes_lwir.size(0), dtype=torch.bool)
+        ignore = torch.zeros( boxes.size(0), dtype=torch.bool)
                
-        for ii, box in enumerate(boxes_vis):
-            ##print("boxes :",boxes)
-            #print("vis_box : ", box)
+        for ii, box in enumerate(boxes):
+            #print("boxes :",boxes)
+            #print("box : ", box)
                         
             x = box[0] * width
             y = box[1] * height
@@ -269,41 +223,16 @@ class KAISTPed(data.Dataset):
                 h < self.cond['hRng'][0] or \
                 h > self.cond['hRng'][1]:
 
-                ignore_vis[ii] = 1
-
-        for ii, box in enumerate(boxes_lwir):
-            ##print("boxes :",boxes)
-            #print("lwir_box : ", box)
-                        
-            x = box[0] * width
-            y = box[1] * height
-            w = ( box[2] - box[0] ) * width
-            h = ( box[3] - box[1] ) * height
-
-            if  x < self.cond['xRng'][0] or \
-                y < self.cond['xRng'][0] or \
-                x+w > self.cond['xRng'][1] or \
-                y+h > self.cond['xRng'][1] or \
-                w < self.cond['wRng'][0] or \
-                w > self.cond['wRng'][1] or \
-                h < self.cond['hRng'][0] or \
-                h > self.cond['hRng'][1]:
-
-                ignore_lwir[ii] = 1
+                ignore[ii] = 1
         
-        boxes_vis[ignore_vis, 4] = -1
-        boxes_lwir[ignore_lwir, 4] = -1
-
-        ##print(f"여기 박스 : {boxes}")
-        vis_labels = boxes_vis[:,4]
-        lwir_labels = boxes_lwir[:,4]
-        ##print(f"여기 레이블 : {labels}")
-        boxes_vis = boxes_vis[:,0:4]
-        boxes_lwir = boxes_lwir[:,0:4]
-        #print("vis_labels : ", vis_labels)
-        #print("lwir_labels : ", lwir_labels)
-        ##print(f"boxes_t : {boxes_t}")
-        return vis, lwir, boxes_vis, boxes_lwir, vis_labels, lwir_labels
+        boxes[ignore, 4] = -1
+        #print(f"여기 박스 : {boxes}")
+        labels = boxes[:,4]
+        #print(f"여기 레이블 : {labels}")
+        boxes_t = boxes[:,0:4]
+        #print("labels : ", labels)
+        #print(f"boxes_t : {boxes_t}")
+        return vis, lwir, boxes_t, labels
 
     def __len__(self):
         return len(self.ids)
@@ -319,25 +248,21 @@ class KAISTPed(data.Dataset):
 
         vis = list()
         lwir = list()
-        vis_box = list()
-        lwir_box = list()
-        vis_labels = list()
-        lwir_labels = list()
+        boxes = list()
+        labels = list()
         index = list()
 
         for b in batch:
             vis.append(b[0])
             lwir.append(b[1])
-            vis_box.append(b[2])
-            lwir_box.append(b[3])
-            vis_labels.append(b[4])
-            lwir_labels.append(b[5])
-            index.append(b[6])
+            boxes.append(b[2])
+            labels.append(b[3])
+            index.append(b[4])
 
         vis = torch.stack(vis, dim=0)
         lwir = torch.stack(lwir, dim=0)
   
-        return vis, lwir, vis_box,lwir_box, vis_labels, lwir_labels, index
+        return vis, lwir, boxes, labels, index
 
 class LoadBox(object):
     """Transforms a VOC annotation into a Tensor of bbox coords and label index

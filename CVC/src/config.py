@@ -5,21 +5,22 @@ from easydict import EasyDict as edict
 import torch
 import numpy as np
 
-from utils.transforms_case1 import *
+from utils.transforms import *
 
 
 # Dataset path
 PATH = edict()
 
-PATH.DB_ROOT = '../../data/CVC-14'
-PATH.JSON_GT_FILE = os.path.join('../CVC14_annotations_test.json' )
+PATH.DB_ROOT = '../data/CVC-14'
+PATH.JSON_GT_FILE = os.path.join('CVC14_annotations_test.json' )
 
 # train
 train = edict()
 
 train.day = "all"
 #train.img_set = f"./cleaned_file_paths.txt"
-train.img_set = f"train-all-02.txt"
+# train.img_set = f"train-all-02.txt"
+train.img_set = f"CVC_100.txt"
 
 #train.checkpoint = "../../checkpoint_ssd300.pth.tar071" ## Load chekpoint
 train.checkpoint = None
@@ -36,23 +37,23 @@ train.momentum = 0.9  # momentum
 train.weight_decay = 5e-4  # weight decay
 train.grad_clip = None  # clip if gradients are exploding, which may happen at larger batch sizes (sometimes at 32) - you will recognize it by a sorting error in the MuliBox loss calculation
 
-train.print_freq = 200
+train.print_freq = 100
 
 train.annotation = "AR-CNN" # AR-CNN, Sanitize, Original 
 
 # test & eval
 test = edict()
 
-test.result_path = '../result2'
+test.result_path = '../result'
 ### coco tool. Save Results(jpg & json) Path
 
 test.day = "all" # all, day, night
 #f"test-{test.day}-20.txt"
-test.img_set = f"test-all-20.txt"
+test.img_set = f"CVC-test.txt"
 
 test.annotation = "AR-CNN"
 
-test.input_size = [471., 640.]
+test.input_size = [512., 640.]
 
 ### test model ~ eval.py
 test.checkpoint = "./jobs/best_checkpoint.pth.tar"
@@ -111,6 +112,8 @@ args.device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
 args.exp_time = None
 args.exp_name = None
 
+args.dataset_type = "CVC"
+
 args.n_classes = 3
 
 ## Semi Unpaired Augmentation
@@ -121,14 +124,12 @@ args.upaired_augmentation = ["TT_RandomHorizontalFlip",
 args.want_augmentation = ["RandomHorizontalFlip",
                           "FixedHorizontalFlip",
                           "RandomResizedCrop"]
-## Train dataset transform                             
+## Train dataset transform
 args["train"].img_transform = Compose([ ColorJitter(0.3, 0.3, 0.3), 
                                         ColorJitterLWIR(contrast=0.3)
-                                        
-                                                                ])
-args["train"].co_transform = Compose([   
-                                        RandomHorizontalFlip(p=0.5), 
-                                        RandomResizedCrop([512,640], \
+                                        ])
+args["train"].co_transform = Compose([  TT_RandomHorizontalFlip(p=0.5), 
+                                        TT_RandomResizedCrop([512,640], \
                                                                 scale=(0.25, 4.0), \
                                                                 ratio=(0.8, 1.2)),
                                         ToTensor(), \

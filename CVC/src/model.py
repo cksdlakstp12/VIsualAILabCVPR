@@ -9,7 +9,7 @@ import torchvision
 
 from utils.utils import *
 
-args = importlib.import_module('config_teacher').args
+args = importlib.import_module('config').args
 device = args.device
 
 
@@ -26,7 +26,7 @@ class VGGBase(nn.Module):
         self.conv1_1_vis = nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=True) 
         self.conv1_1_bn_vis = nn.BatchNorm2d(64, affine=True)
         self.conv1_2_vis = nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=True)
-        self.conv1_2_bn_vis = nn.BatchNorm2d(64, affine=True)
+        self.conv1_2_bn_vis = nn.BatchNorm2d(64, affine=True)        
         self.pool1_vis = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)
 
         self.conv2_1_vis = nn.Conv2d(64, 128, kernel_size=3, padding=1, bias=True)
@@ -51,7 +51,7 @@ class VGGBase(nn.Module):
         self.conv4_3_bn_vis = nn.BatchNorm2d(512, affine=True)
 
         #############################################################################
-        
+
         #################################### Thermal ####################################
  
         # Standard convolutional layers in VGG16
@@ -218,7 +218,7 @@ class VGGBase(nn.Module):
         
         out_vis = F.relu(self.conv6_1_bn(self.conv6_1(out_vis))) 
         out_vis = F.relu(self.conv6_2(out_vis))
-        out_lwir = F.relu(self.conv6_1_bn(self.conv6_1(out_lwir)))
+        out_lwir = F.relu(self.conv6_1_bn(self.conv6_1(out_lwir))) 
         out_lwir = F.relu(self.conv6_2(out_lwir))
 
         #########################################################################
@@ -263,7 +263,6 @@ class VGGBase(nn.Module):
         conv9_feats = F.relu(self.feat_5_bn(self.feat_5(conv9_feats)))
 
         ######################################################################### 
-
 
         out_vis = F.relu(self.conv10_1(out_vis)) 
         out_vis = F.relu(self.conv10_2(out_vis)) 
@@ -315,6 +314,146 @@ class VGGBase(nn.Module):
         self.load_state_dict(state_dict)
 
         print("\nLoaded base model.\n")
+
+
+class VGGBase3Way(VGGBase):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, image_vis, image_lwir):
+        """
+        Forward propagation.
+
+        :param image: images, a tensor of dimensions (N, 3, 300, 300)
+        :return: lower-level feature maps conv4_3 and conv7
+        """
+ 
+        ############################ RGB #####################################
+
+        out_vis = F.relu(self.conv1_1_bn_vis(self.conv1_1_vis(image_vis)))  
+        out_vis = F.relu(self.conv1_2_bn_vis(self.conv1_2_vis(out_vis))) 
+        out_vis = self.pool1_vis(out_vis)  
+
+        out_vis = F.relu(self.conv2_1_bn_vis(self.conv2_1_vis(out_vis)))
+        out_vis = F.relu(self.conv2_2_bn_vis(self.conv2_2_vis(out_vis))) 
+        out_vis = self.pool2_vis(out_vis) 
+
+        out_vis = F.relu(self.conv3_1_bn_vis(self.conv3_1_vis(out_vis))) 
+        out_vis = F.relu(self.conv3_2_bn_vis(self.conv3_2_vis(out_vis))) 
+        out_vis = F.relu(self.conv3_3_bn_vis(self.conv3_3_vis(out_vis)))
+        out_vis = self.pool3_vis(out_vis)
+        
+        out_vis = F.relu(self.conv4_1_bn_vis(self.conv4_1_vis(out_vis))) 
+        out_vis = F.relu(self.conv4_2_bn_vis(self.conv4_2_vis(out_vis))) 
+        out_vis = F.relu(self.conv4_3_bn_vis(self.conv4_3_vis(out_vis))) 
+        out_vis_1 = self.pool4(out_vis)
+        ##########################################################################
+
+        ############################ Thermal #####################################
+
+        out_lwir = F.relu(self.conv1_1_bn_lwir(self.conv1_1_lwir(image_lwir)))  
+        out_lwir = F.relu(self.conv1_2_bn_lwir(self.conv1_2_lwir(out_lwir))) 
+        out_lwir = self.pool1_lwir(out_lwir)  
+
+        out_lwir = F.relu(self.conv2_1_bn_lwir(self.conv2_1_lwir(out_lwir)))
+        out_lwir = F.relu(self.conv2_2_bn_lwir(self.conv2_2_lwir(out_lwir))) 
+        out_lwir = self.pool2_lwir(out_lwir) 
+
+        out_lwir = F.relu(self.conv3_1_bn_lwir(self.conv3_1_lwir(out_lwir))) 
+        out_lwir = F.relu(self.conv3_2_bn_lwir(self.conv3_2_lwir(out_lwir))) 
+        out_lwir = F.relu(self.conv3_3_bn_lwir(self.conv3_3_lwir(out_lwir))) 
+        out_lwir = self.pool3_lwir(out_lwir)
+
+        out_lwir = F.relu(self.conv4_1_bn_lwir(self.conv4_1_lwir(out_lwir))) 
+        out_lwir = F.relu(self.conv4_2_bn_lwir(self.conv4_2_lwir(out_lwir))) 
+        out_lwir = F.relu(self.conv4_3_bn_lwir(self.conv4_3_lwir(out_lwir))) 
+        out_lwir_1 = self.pool4(out_lwir)
+
+        #########################################################################
+
+        conv4_3_feats = torch.cat([out_vis_1, out_lwir_1], dim=1)
+        conv4_3_feats = F.relu(self.feat_1_bn(self.feat_1(conv4_3_feats)))
+
+        #########################################################################
+
+        # Rescale conv4_3 after L2 norm
+        norm = conv4_3_feats.pow(2).sum(dim=1, keepdim=True).sqrt()
+        conv4_3_feats = conv4_3_feats / norm
+        conv4_3_feats = conv4_3_feats * self.rescale_factors
+        
+        out_vis = F.relu(self.conv5_1_bn(self.conv5_1(out_vis_1))) 
+        out_vis = F.relu(self.conv5_2_bn(self.conv5_2(out_vis))) 
+        out_vis = F.relu(self.conv5_3_bn(self.conv5_3(out_vis)))
+        out_vis = self.pool5(out_vis)
+        out_lwir = F.relu(self.conv5_1_bn(self.conv5_1(out_lwir_1))) 
+        out_lwir = F.relu(self.conv5_2_bn(self.conv5_2(out_lwir))) 
+        out_lwir = F.relu(self.conv5_3_bn(self.conv5_3(out_lwir))) 
+        out_lwir = self.pool5(out_lwir)
+        
+        out_vis = F.relu(self.conv6_1_bn(self.conv6_1(out_vis))) 
+        out_vis_2 = F.relu(self.conv6_2(out_vis))
+        out_lwir = F.relu(self.conv6_1_bn(self.conv6_1(out_lwir))) 
+        out_lwir_2 = F.relu(self.conv6_2(out_lwir))
+
+        #########################################################################
+
+        conv6_feats = torch.cat([out_vis_2, out_lwir_2], dim=1)
+        conv6_feats = F.relu(self.feat_2_bn(self.feat_2(conv6_feats)))
+
+        #########################################################################
+
+        out_vis = F.relu(self.conv7_1(out_vis_2))
+        out_vis_3 = F.relu(self.conv7_2_bn(self.conv7_2(out_vis))) 
+        out_lwir = F.relu(self.conv7_1(out_lwir_2))
+        out_lwir_3 = F.relu(self.conv7_2_bn(self.conv7_2(out_lwir)))
+
+        #########################################################################
+
+        conv7_feats = torch.cat([out_vis_3, out_lwir_3], dim=1)
+        conv7_feats = F.relu(self.feat_3_bn(self.feat_3(conv7_feats)))
+
+        ######################################################################### 
+
+        out_vis = F.relu(self.conv8_1(out_vis_3))
+        out_vis_4 = F.relu(self.conv8_2(out_vis)) 
+        out_lwir = F.relu(self.conv8_1(out_lwir_3))
+        out_lwir_4 = F.relu(self.conv8_2(out_lwir)) 
+
+        #########################################################################
+
+        conv8_feats = torch.cat([out_vis_4, out_lwir_4], dim=1)
+        conv8_feats = F.relu(self.feat_4_bn(self.feat_4(conv8_feats)))
+
+        ######################################################################### 
+
+        out_vis = F.relu(self.conv9_1(out_vis_4))
+        out_vis_5 = F.relu(self.conv9_2(out_vis))
+        out_lwir = F.relu(self.conv9_1(out_lwir_4))
+        out_lwir_5 = F.relu(self.conv9_2(out_lwir))
+
+        #########################################################################
+
+        conv9_feats = torch.cat([out_vis_5, out_lwir_5], dim=1)
+        conv9_feats = F.relu(self.feat_5_bn(self.feat_5(conv9_feats)))
+
+        ######################################################################### 
+
+        out_vis = F.relu(self.conv10_1(out_vis_5)) 
+        out_vis_6 = F.relu(self.conv10_2(out_vis)) 
+        out_lwir = F.relu(self.conv10_1(out_lwir_5)) 
+        out_lwir_6 = F.relu(self.conv10_2(out_lwir))
+
+        #########################################################################
+
+        conv10_feats = torch.cat([out_vis_6, out_lwir_6], dim=1)
+        conv10_feats = F.relu(self.feat_6_bn(self.feat_6(conv10_feats)))
+
+        ######################################################################### 
+
+        # Lower-level feature maps
+        return conv4_3_feats, conv6_feats, conv7_feats, conv8_feats, conv9_feats, conv10_feats,\
+               out_vis_1, out_vis_2, out_vis_3, out_vis_4, out_vis_5, out_vis_6, \
+               out_lwir_1, out_lwir_2, out_lwir_3, out_lwir_4, out_lwir_5, out_lwir_6
 
 
 class PredictionConvolutions(nn.Module):
@@ -435,7 +574,7 @@ class PredictionConvolutions(nn.Module):
                                    dim=1)
 
         return locs, classes_scores
-
+    
 
 class SSD300(nn.Module):
     """
@@ -465,7 +604,7 @@ class SSD300(nn.Module):
 
         # Run prediction convolutions (predict offsets w.r.t prior-boxes and classes in each resulting localization box)
         locs, classes_scores = self.pred_convs(conv4_3_feats, conv6_feats, conv7_feats, conv8_feats, conv9_feats, conv10_feats)  # (N, 8732, 4), (N, 8732, n_classes)
-        return locs, classes_scores
+        return locs, classes_scores, (conv4_3_feats, conv6_feats , conv7_feats, conv8_feats, conv9_feats, conv10_feats)
 
     def create_prior_boxes(self):
         """
@@ -550,7 +689,7 @@ class SSD300(nn.Module):
         all_images_boxes = list()
         all_images_labels = list()
         all_images_scores = list()
-        all_images_bg_scores = list()
+        # all_images_bg_scores = list()
 
         assert n_priors == predicted_locs.size(1) == predicted_scores.size(1)
 
@@ -563,20 +702,20 @@ class SSD300(nn.Module):
             image_boxes = list()
             image_labels = list()
             image_scores = list()
-            image_bf_scores = list()
+            #image_bf_scores = list()
             
             predicted_fg_scores = predicted_scores[i][:,1:].mean(dim=1)
             score_above_min_score = predicted_fg_scores > min_score
             n_above_min_score = score_above_min_score.sum().item()
 
             class_scores = predicted_scores[i][:,1:][score_above_min_score]
-            bg_scores = predicted_scores[i][:,0][score_above_min_score]
+            # bg_scores = predicted_scores[i][:,0][score_above_min_score]
             class_decoded_locs = decoded_locs[score_above_min_score]
             
             # Sort predicted boxes and scores by scores\
             _, sort_ind = class_scores.mean(dim=1).sort(dim=0, descending=True)
             class_scores = class_scores[sort_ind]
-            bg_scores = bg_scores[sort_ind]
+            # bg_scores = bg_scores[sort_ind]
             class_decoded_locs = class_decoded_locs[sort_ind]  # (n_min_score, 4)
 
             # Find the overlap between predicted boxes
@@ -597,20 +736,20 @@ class SSD300(nn.Module):
             image_boxes.append(class_decoded_locs[~suppress])
             image_labels.append(torch.ones((~suppress).sum().item()).to(device))
             image_scores.append(class_scores[~suppress])
-            image_bf_scores.append(bg_scores[~suppress])
+            # image_bf_scores.append(bg_scores[~suppress])
 
             # If no object in any class is found, store a placeholder for 'background'
             if len(image_boxes) == 0:
                 image_boxes.append(torch.FloatTensor([[0., 0., 1., 1.]]).to(device))
                 image_labels.append(torch.LongTensor([0]).to(device))
                 image_scores.append(torch.FloatTensor([0.]).to(device))
-                image_bf_scores.append(torch.FloatTensor([0.]).to(device))
+                # image_bf_scores.append(torch.FloatTensor([0.]).to(device))
 
             # Concatenate into single tensors
             image_boxes = torch.cat(image_boxes, dim=0)
             image_labels = torch.cat(image_labels, dim=0)
             image_scores = torch.cat(image_scores, dim=0)
-            image_bg_scores = torch.cat(image_bf_scores, dim=0)
+            # image_bg_scores = torch.cat(image_bf_scores, dim=0)
             n_objects = image_scores.size(0)
 
             # Keep only the top k objects
@@ -619,15 +758,193 @@ class SSD300(nn.Module):
                 image_scores = image_scores[sort_ind][:top_k]  # (top_k)
                 image_boxes = image_boxes[sort_ind][:top_k]  # (top_k, 4)
                 image_labels = image_labels[sort_ind][:top_k]  # (top_k)
-                image_bg_scores = image_bg_scores[sort_ind][:top_k]
+                # image_bg_scores = image_bg_scores[sort_ind][:top_k]
 
             # Append to lists that store predicted boxes and scores for all images
             all_images_boxes.append(image_boxes)
             all_images_labels.append(image_labels)
             all_images_scores.append(image_scores)
-            all_images_bg_scores.append(image_bg_scores)
+            # all_images_bg_scores.append(image_bg_scores)
 
-        return all_images_boxes, all_images_labels, all_images_scores, all_images_bg_scores  # lists of length batch_size
+        return all_images_boxes, all_images_labels, all_images_scores#, all_images_bg_scores  # lists of length batch_size
+    
+    def detect_objects_cuda(self, predicted_locs, predicted_scores, min_score, max_overlap, top_k):
+        """
+        Decipher the 8732 locations and class scores (output of ths SSD300) to detect objects.
+        For each class, perform Non-Maximum Suppression (NMS) on boxes that are above a minimum threshold.
+        """
+        batch_size = predicted_locs.size(0)
+        n_priors = self.priors_cxcy.size(0)
+        predicted_scores = torch.sigmoid(predicted_scores)
+
+        # Lists to store final predicted boxes, labels, and scores for all images
+        all_images_boxes = []
+        all_images_labels = []
+        all_images_scores = []
+
+        assert n_priors == predicted_locs.size(1) == predicted_scores.size(1)
+
+        for i in range(batch_size):
+            # Decode object coordinates from the form we regressed predicted boxes to
+            decoded_locs = cxcy_to_xy(gcxgcy_to_cxcy(predicted_locs[i], self.priors_cxcy)) 
+
+            predicted_fg_scores = predicted_scores[i][:,1:].mean(dim=1)
+            score_above_min_score = predicted_fg_scores > min_score
+
+            class_scores = predicted_scores[i][:,1:][score_above_min_score]
+            class_decoded_locs = decoded_locs[score_above_min_score]
+
+            # Sort predicted boxes and scores by scores
+            _, sort_ind = class_scores.mean(dim=1).sort(dim=0, descending=True)
+            class_scores = class_scores[sort_ind]
+            class_decoded_locs = class_decoded_locs[sort_ind]
+
+            # torchvision의 nms 함수를 사용하여 NMS 수행
+            keep = torchvision.ops.nms(class_decoded_locs, class_scores.mean(dim=1), max_overlap)
+
+            # NMS를 통과한 박스, 라벨, 점수만 선택
+            image_boxes = class_decoded_locs[keep]
+            image_labels = torch.ones(keep.size(0), device=class_decoded_locs.device)
+            image_scores = class_scores[keep]
+
+            # top_k만큼만 유지
+            if image_scores.size(0) > top_k:
+                _, indices = image_scores.mean(dim=1).sort(descending=True)
+                indices = indices[:top_k]
+                image_boxes = image_boxes[indices]
+                image_labels = image_labels[indices]
+                image_scores = image_scores[indices]
+
+            # 결과 저장
+            all_images_boxes.append(image_boxes)
+            all_images_labels.append(image_labels)
+            all_images_scores.append(image_scores)
+
+        return all_images_boxes, all_images_labels, all_images_scores
+    
+
+class SSD300_CVC(SSD300):
+    """
+    The SSD300 network - encapsulates the base VGG network, auxiliary, and prediction convolutions.
+    """
+
+    def __init__(self, n_classes):
+        super().__init__(n_classes)
+
+        self.n_classes = n_classes
+
+        self.base = VGGBase()
+        self.pred_convs = PredictionConvolutions(n_classes) # for fusion
+
+    def create_prior_boxes(self):
+        """
+        Create the 8732 prior (default) boxes for the SSD300, as defined in the paper.
+
+        :return: prior boxes in center-size coordinates, a tensor of dimensions (8732, 4)
+        """
+
+        fmap_dims = {'conv4_3': [80,64],
+                     'conv6': [40,32],
+                     'conv7': [20,16],
+                     'conv8': [10,8],
+                     'conv9': [10,8],
+                     'conv10': [10,8]}
+
+        scale_ratios = {'conv4_3': [1., pow(2,1/3.), pow(2,2/3.)],
+                      'conv6': [1., pow(2,1/3.), pow(2,2/3.)],
+                      'conv7': [1., pow(2,1/3.), pow(2,2/3.)],
+                      'conv8': [1., pow(2,1/3.), pow(2,2/3.)],
+                      'conv9': [1., pow(2,1/3.), pow(2,2/3.)],
+                      'conv10': [1., pow(2,1/3.), pow(2,2/3.)]}
+
+
+        aspect_ratios = {'conv4_3': [1/2., 1/1.],
+                         'conv6': [1/2., 1/1.],
+                         'conv7': [1/2., 1/1.],
+                         'conv8': [1/2., 1/1.],
+                         'conv9': [1/2., 1/1.],
+                         'conv10': [1/2., 1/1.]}
+
+
+        anchor_areas = {'conv4_3': [40*40.],
+                         'conv6': [80*80.],
+                         'conv7': [160*160.],
+                         'conv8': [200*200.],
+                         'conv9': [280*280.],
+                         'conv10': [360*360.]} 
+
+
+        # fmaps = list(fmap_dims.keys())
+        fmaps = ['conv4_3', 'conv6', 'conv7', 'conv8', 'conv9', 'conv10']
+
+        prior_boxes = []
+
+        for k, fmap in enumerate(fmaps):
+            for i in range(fmap_dims[fmap][1]):
+                for j in range(fmap_dims[fmap][0]):
+                    cx = (j + 0.5) / fmap_dims[fmap][0]
+                    cy = (i + 0.5) / fmap_dims[fmap][1]
+                    for s in anchor_areas[fmap]:
+                        for ar in aspect_ratios[fmap]: 
+                            h = sqrt(s/ar)                
+                            w = ar * h
+                            for sr in scale_ratios[fmap]: # scale
+                                anchor_h = h*sr/471.
+                                anchor_w = w*sr/640.
+                                prior_boxes.append([cx, cy, anchor_w, anchor_h])
+
+        prior_boxes = torch.FloatTensor(prior_boxes).to(device)  # (8732, 4)
+
+        return prior_boxes
+    
+    def forward(self, image_vis, image_lwir):
+        """
+        Forward propagation.
+
+        :param image: images, a tensor of dimensions (N, 3, 300, 300)
+        :return: 8732 locations and class scores (i.e. w.r.t each prior box) for each image
+        """
+        # Run VGG base network convolutions (lower level feature map generators)
+        conv4_3_feats, conv6_feats, conv7_feats, conv8_feats, conv9_feats, conv10_feats = self.base(image_vis, image_lwir)
+
+        # Run prediction convolutions (predict offsets w.r.t prior-boxes and classes in each resulting localization box)
+        locs, classes_scores = self.pred_convs(conv4_3_feats, conv6_feats, conv7_feats, conv8_feats, conv9_feats, conv10_feats)  # (N, 8732, 4), (N, 8732, n_classes)
+        return locs, classes_scores, (conv4_3_feats, conv6_feats , conv7_feats, conv8_feats, conv9_feats, conv10_feats)
+
+
+class SSD300_3Way(SSD300):
+    """
+    The SSD300 network - encapsulates the base VGG network, auxiliary, and prediction convolutions.
+    """
+
+    def __init__(self, n_classes):
+        super().__init__(n_classes)
+
+        self.n_classes = n_classes
+
+        self.base = VGGBase3Way()
+        self.pred_convs = PredictionConvolutions(n_classes) # for fusion
+        self.pred_convs_vis = PredictionConvolutions(n_classes)
+        self.pred_convs_lwir = PredictionConvolutions(n_classes)
+
+    def forward(self, image_vis, image_lwir):
+        """
+        Forward propagation.
+
+        :param image: images, a tensor of dimensions (N, 3, 300, 300)
+        :return: 8732 locations and class scores (i.e. w.r.t each prior box) for each image
+        """
+        # Run VGG base network convolutions (lower level feature map generators)
+        conv4_3_feats, conv6_feats, conv7_feats, conv8_feats, conv9_feats, conv10_feats, \
+        out_vis_1, out_vis_2, out_vis_3, out_vis_4, out_vis_5, out_vis_6, \
+        out_lwir_1, out_lwir_2, out_lwir_3, out_lwir_4, out_lwir_5, out_lwir_6 = self.base(image_vis, image_lwir)
+
+        # Run prediction convolutions (predict offsets w.r.t prior-boxes and classes in each resulting localization box)
+        locs_fusion, classes_scores_fusion = self.pred_convs(conv4_3_feats, conv6_feats, conv7_feats, conv8_feats, conv9_feats, conv10_feats)  # (N, 8732, 4), (N, 8732, n_classes)
+        locs_vis, classes_scores_vis = self.pred_convs_vis(out_vis_1, out_vis_2, out_vis_3, out_vis_4, out_vis_5, out_vis_6)  # (N, 8732, 4), (N, 8732, n_classes)
+        locs_lwir, classes_scores_lwir = self.pred_convs_lwir(out_lwir_1, out_lwir_2, out_lwir_3, out_lwir_4, out_lwir_5, out_lwir_6)  # (N, 8732, 4), (N, 8732, n_classes)
+        return locs_fusion, classes_scores_fusion, locs_vis, classes_scores_vis, locs_lwir, classes_scores_lwir, \
+               (conv4_3_feats, conv6_feats , conv7_feats, conv8_feats, conv9_feats, conv10_feats)
 
 
 class MultiBoxLoss(nn.Module):
@@ -674,9 +991,7 @@ class MultiBoxLoss(nn.Module):
         # For each image
         for i in range(batch_size):
             n_objects = boxes[i].size(0)
-            #print(boxes)
-            #print("Dimensions of boxes[i]:", boxes[i].shape)
-            #print("Dimensions of self.priors_xy:", self.priors_xy.shape)
+
             overlap = find_jaccard_overlap(boxes[i],self.priors_xy)
 
             # For each prior, find the object that has the maximum overlap
@@ -757,6 +1072,26 @@ class MultiBoxLoss(nn.Module):
         # TOTAL LOSS
 
         return conf_loss + self.alpha * loc_loss , conf_loss , loc_loss, n_positives
+    
+class BoxLoss(nn.Module):
+    """
+    A simplified loss function to compute the smooth L1 loss between two sets of boxes.
+    """
+
+    def __init__(self):
+        super(BoxLoss, self).__init__()
+        self.smooth_l1 = nn.SmoothL1Loss()
+
+    def forward(self, boxes, Target_boxes):
+        """
+        Forward propagation.
+
+        :param boxes: predicted bounding boxes, a tensor of dimensions (N, 8732, 4)
+        :param Target_boxes: target bounding boxes, a tensor of dimensions (N, 8732, 4)
+        :return: smooth_L1 loss, a scalar
+        """
+        
+        return self.smooth_l1(boxes, Target_boxes)
 
 def _to_one_hot(y, n_dims, dtype=torch.cuda.FloatTensor):
     scatter_dim = len(y.size())

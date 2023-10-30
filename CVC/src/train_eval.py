@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Dict
-import config_teacher as config_case1
+import config as config_case1
 import logging
 import numpy as np
 import os
@@ -10,9 +10,9 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 
-from datasets_teacher_test import KAISTPed
-from inference_teacher_test import val_epoch, save_results
-from model_teacher import SSD300, MultiBoxLoss
+from datasets import KAISTPed
+from inference import val_epoch, save_results
+from model import SSD300, MultiBoxLoss
 from utils import utils
 from utils.evaluation_script import evaluate
 
@@ -95,7 +95,7 @@ def main():
     
     # TODO(sohwang): should config_case1.exp_name be updated from command line argument?
     exp_name = ('_' + args.exp_name) if args.exp_name else '_'
-    jobs_dir = os.path.join('../jobs3', args.exp_time + exp_name)
+    jobs_dir = os.path.join('../jobs', args.exp_time + exp_name)
     os.makedirs(jobs_dir, exist_ok=True)
     args.jobs_dir = jobs_dir
 
@@ -172,40 +172,29 @@ def train_epoch(model: SSD300,
     start = time.time()
     
     # Batches
-    for batch_idx, (image_vis, image_lwir, vis_box, lwir_box, vis_labels, lwir_labels, _) in enumerate(dataloader):
+    for batch_idx, (image_vis, image_lwir, boxes, labels, _) in enumerate(dataloader):
         data_time.update(time.time() - start)
 
         # Move to default device
         image_vis = image_vis.to(device)
         image_lwir = image_lwir.to(device)
 
-        vis_box = [box.to(device) for box in vis_box]
-        lwir_box = [box.to(device) for box in lwir_box]
-        #print("vis_box :", vis_box)
-        #print("lwir_box :", lwir_box)
-        #boxes = [box.to(device) for box in boxes]
-        vis_labels = [label.to(device) for label in vis_labels]
-        lwir_labels = [label.to(device) for label in lwir_labels]
+        boxes = [box.to(device) for box in boxes]
+        labels = [label.to(device) for label in labels]
 
         # Forward prop.
-        predicted_locs, predicted_scores = model(image_vis, image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
+        predicted_locs, predicted_scores, _ = model(image_vis, image_lwir)  # (N, 8732, 4), (N, 8732, n_classes)
 
-        # vis_Loss
-        #print("loss vis box :", vis_box)
-        vis_loss, vis_cls_loss, vis_loc_loss, vis_n_positives = criterion(predicted_locs, predicted_scores, vis_box, vis_labels)  # scalar
-        # lwir_Loss
-        #print("loss lwir box :", lwir_box)
-        lwir_loss, lwir_cls_loss, lwir_loc_loss, lwir_n_positives = criterion(predicted_locs, predicted_scores, lwir_box, lwir_labels)
-
-        loss = vis_cls_loss+ vis_loc_loss + lwir_cls_loss + lwir_loc_loss
+        # Loss
+        loss, cls_loss, loc_loss, n_positives = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
 
         # Backward prop.
         optimizer.zero_grad()
         loss.backward()
 
         # TODO(sohwang): Do we need this?
-        #if np.isnan(loss.item()):
-            #loss, cls_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
+        if np.isnan(loss.item()):
+            loss, cls_loss, loc_loss = criterion(predicted_locs, predicted_scores, boxes, labels)  # scalar
 
         # Clip gradients, if necessary
         if kwargs.get('grad_clip', None):
@@ -227,12 +216,11 @@ def train_epoch(model: SSD300,
                         'Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                         'Data Time {data_time.val:.3f} ({data_time.avg:.3f})\t'
                         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                        'num of Positive {vis_Positive} {lwir_Positive}\t'.format(batch_idx, len(dataloader),
+                        'num of Positive {Positive}\t'.format(batch_idx, len(dataloader),
                                                               batch_time=batch_time,
                                                               data_time=data_time,
                                                               loss=losses_sum,
-                                                              vis_Positive=vis_n_positives,
-                                                              lwir_Positive=lwir_n_positives))
+                                                              Positive=n_positives))
 
     return losses_sum.avg
 

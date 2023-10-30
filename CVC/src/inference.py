@@ -4,19 +4,19 @@ from pathlib import Path
 from tqdm import tqdm
 from typing import Dict, Tuple
 import argparse
-import config_teacher as config
+import config as config
 import numpy as np
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from datasets_teacher import KAISTPed
+from datasets import KAISTPed
 from utils.transforms import FusionDeadZone
 from utils.evaluation_script import evaluate
 from vis import visualize
 
-from model_teacher import SSD300
+from model import SSD300
 
 """
 def run_inference(FDZ, model_path, result_dir, vis=False):
@@ -80,10 +80,10 @@ def val_epoch(model: SSD300, dataloader: DataLoader, input_size: Tuple, min_scor
             image_lwir = image_lwir.to(device)
 
             # Forward prop.
-            predicted_locs, predicted_scores = model(image_vis, image_lwir)
+            predicted_locs, predicted_scores, _ = model(image_vis, image_lwir)
 
             # Detect objects in SSD output
-            detections = model.module.detect_objects(predicted_locs, predicted_scores,
+            detections = model.module.detect_objects_cuda(predicted_locs, predicted_scores,
                                                      min_score=min_score, max_overlap=0.425, top_k=200)
 
             det_boxes_batch, det_labels_batch, det_scores_batch = detections[:3]

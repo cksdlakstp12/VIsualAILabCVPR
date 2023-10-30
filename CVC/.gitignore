@@ -1,0 +1,7 @@
+data/*
+__pycache__
+src/jobs/*
+error
+slurm
+learning_schedule.txt
+.vscode
